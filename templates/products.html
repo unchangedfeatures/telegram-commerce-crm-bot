@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Товары - PewPuff Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-box"></i> Управление товарами</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProductModal">
+        <i class="bi bi-plus-circle"></i> Добавить товар
+    </button>
+</div>
+
+{% for brand_data in products_data %}
+<div class="table-container mb-4">
+    <h5 class="mb-3">{{ brand_data.brand.brand_name }}</h5>
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Название</th>
+                <th>Цена</th>
+                <th>Остаток</th>
+                <th>Продано</th>
+                <th>Статус</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in brand_data.products %}
+            <tr>
+                <td>{{ product.product_id }}</td>
+                <td>{{ product.product_name }}</td>
+                <td>{{ product.price }}€</td>
+                <td>
+                    <div class="input-group input-group-sm" style="max-width: 150px;">
+                        <input type="number" class="form-control" 
+                               value="{{ product.stock_quantity }}" 
+                               id="stock-{{ product.product_id }}"
+                               min="0">
+                        <button class="btn btn-outline-primary" 
+                                onclick="updateStock({{ product.product_id }})">
+                            <i class="bi bi-check"></i>
+                        </button>
+                    </div>
+                </td>
+                <td>{{ product.times_chosen or 0 }}</td>
+                <td>
+                    {% if product.is_active %}
+                        <span class="badge bg-success">Активен</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Неактивен</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-info" 
+                            onclick="viewProduct({{ product.product_id }})">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+
+<!-- Модальное окно добавления товара -->
+<div class="modal fade" id="createProductModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить товар</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createProductForm">
+                    <div class="mb-3">
+                        <label class="form-label">Бренд</label>
+                        <select class="form-select" name="brand_id" required>
+                            {% for brand_data in products_data %}
+                            <option value="{{ brand_data.brand.brand_id }}">
+                                {{ brand_data.brand.brand_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Название товара</label>
+                        <input type="text" class="form-control" name="product_name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Цена (€)</label>
+                        <input type="number" class="form-control" name="price" 
+                               step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Количество на складе</label>
+                        <input type="number" class="form-control" name="stock_quantity" 
+                               min="0" value="0" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="createProduct()">Создать</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function updateStock(productId) {
+        const quantity = document.getElementById(`stock-${productId}`).value;
+        
+        fetch('/products/update-stock', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({product_id: productId, quantity: parseInt(quantity)})
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                alert('✅ Остаток обновлен!');
+            } else {
+                alert('❌ Ошибка: ' + result.error);
+            }
+        });
+    }
+    
+    function createProduct() {
+        const form = document.getElementById('createProductForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        fetch('/products/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                location.reload();
+            } else {
+                alert('❌ Ошибка: ' + result.error);
+            }
+        });
+    }
+    
+    function viewProduct(productId) {
+        // Можно добавить модальное окно с подробной информацией
+        alert('Просмотр товара #' + productId);
+    }
+</script>
+{% endblock %}

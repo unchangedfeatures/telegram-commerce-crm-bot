@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Заказы - PewPuff Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-bag"></i> Заказы</h2>
+</div>
+
+<div class="table-container mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('orders', status='all') }}" 
+               class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                Все
+            </a>
+            <a href="{{ url_for('orders', status='pending') }}" 
+               class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+                Ожидают
+            </a>
+            <a href="{{ url_for('orders', status='accepted') }}" 
+               class="btn btn-sm {% if status_filter == 'accepted' %}btn-info{% else %}btn-outline-info{% endif %}">
+                Приняты
+            </a>
+            <a href="{{ url_for('orders', status='delivery') }}" 
+               class="btn btn-sm {% if status_filter == 'delivery' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                В доставке
+            </a>
+            <a href="{{ url_for('orders', status='completed') }}" 
+               class="btn btn-sm {% if status_filter == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">
+                Завершены
+            </a>
+            <a href="{{ url_for('orders', status='declined') }}" 
+               class="btn btn-sm {% if status_filter == 'declined' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+                Отклонены
+            </a>
+        </div>
+    </div>
+    
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Пользователь</th>
+                <th>Телефон</th>
+                <th>Сумма</th>
+                <th>Статус</th>
+                <th>Оплата</th>
+                <th>Дата</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td><a href="{{ url_for('order_detail', order_id=order.order_id) }}">#{{ order.order_id }}</a></td>
+                <td>
+                    {% if order.username %}
+                        <a href="{{ url_for('user_detail', telegram_id=order.telegram_id) }}">
+                            @{{ order.username }}
+                        </a>
+                    {% else %}
+                        ID: {{ order.telegram_id }}
+                    {% endif %}
+                </td>
+                <td>{{ order.phone or '-' }}</td>
+                <td>{{ "%.2f"|format(order.final_amount) }}€</td>
+                <td>
+                    {% if order.status == 'pending' %}
+                        <span class="badge bg-warning">Ожидает</span>
+                    {% elif order.status == 'accepted' %}
+                        <span class="badge bg-info">Принят</span>
+                    {% elif order.status == 'delivery' %}
+                        <span class="badge bg-primary">В доставке</span>
+                    {% elif order.status == 'completed' %}
+                        <span class="badge bg-success">Завершен</span>
+                    {% elif order.status == 'declined' %}
+                        <span class="badge bg-danger">Отклонен</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if order.payment_status == 'paid' %}
+                        <span class="badge bg-success">Оплачен</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Не оплачен</span>
+                    {% endif %}
+                </td>
+                <td>{{ order.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td>
+                    <a href="{{ url_for('order_detail', order_id=order.order_id) }}" 
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <!-- Пагинация -->
+    {% if total_pages > 1 %}
+    <nav>
+        <ul class="pagination justify-content-center">
+            {% for p in range(1, total_pages + 1) %}
+            <li class="page-item {% if p == page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('orders', status=status_filter, page=p) }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}
