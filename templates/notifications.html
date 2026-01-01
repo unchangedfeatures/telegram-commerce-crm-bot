@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Уведомления - PewPuff Admin{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2><i class="bi bi-bell"></i> Уведомления и рассылки</h2>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="table-container">
+            <h5 class="mb-3">📤 Отправить пользователю</h5>
+            <form id="sendUserForm">
+                <div class="mb-3">
+                    <label class="form-label">Telegram ID пользователя</label>
+                    <input type="number" class="form-control" name="telegram_id" required placeholder="123456789">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Сообщение</label>
+                    <textarea class="form-control" name="message" rows="5" required placeholder="Введите текст сообщения..."></textarea>
+                    <small class="text-muted">HTML разметка поддерживается</small>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send"></i> Отправить
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="table-container">
+            <h5 class="mb-3">📢 Глобальная рассылка</h5>
+            <form id="broadcastForm">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Внимание!</strong> Сообщение будет отправлено всем подписанным пользователям.
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Сообщение</label>
+                    <textarea class="form-control" name="message" rows="5" required placeholder="Введите текст для рассылки..."></textarea>
+                    <small class="text-muted">HTML разметка поддерживается</small>
+                </div>
+                
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-megaphone"></i> Отправить всем
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <div class="table-container">
+        <h5 class="mb-3">💡 Примеры форматирования</h5>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Код</th>
+                    <th>Результат</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>&lt;b&gt;Жирный текст&lt;/b&gt;</code></td>
+                    <td><b>Жирный текст</b></td>
+                </tr>
+                <tr>
+                    <td><code>&lt;i&gt;Курсив&lt;/i&gt;</code></td>
+                    <td><i>Курсив</i></td>
+                </tr>
+                <tr>
+                    <td><code>&lt;code&gt;Код&lt;/code&gt;</code></td>
+                    <td><code>Код</code></td>
+                </tr>
+                <tr>
+                    <td><code>&lt;a href="url"&gt;Ссылка&lt;/a&gt;</code></td>
+                    <td><a href="#">Ссылка</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="mt-4">
+    <div class="table-container">
+        <h5 class="mb-3">📋 Шаблоны сообщений</h5>
+        <div class="row g-2">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Новая акция</h6>
+                        <p class="card-text small text-muted">
+                            🔥 <b>Новая акция!</b><br>
+                            Скидка 20% на все товары до конца недели!<br>
+                            Используйте промокод: <code>SALE20</code>
+                        </p>
+                        <button class="btn btn-sm btn-outline-primary" onclick="useTemplate(1)">Использовать</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Новые товары</h6>
+                        <p class="card-text small text-muted">
+                            ✨ <b>Новинки в ассортименте!</b><br>
+                            Встречайте новые вкусы HQD.<br>
+                            Заказывайте прямо сейчас!
+                        </p>
+                        <button class="btn btn-sm btn-outline-primary" onclick="useTemplate(2)">Использовать</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const templates = {
+        1: '🔥 <b>Новая акция!</b>\n\nСкидка 20% на все товары до конца недели!\n\nИспользуйте промокод: <code>SALE20</code>',
+        2: '✨ <b>Новинки в ассортименте!</b>\n\nВстречайте новые вкусы HQD.\n\nЗаказывайте прямо сейчас!'
+    };
+    
+    function useTemplate(id) {
+        document.querySelector('#broadcastForm textarea').value = templates[id];
+    }
+    
+    document.getElementById('sendUserForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+        
+        fetch('/notifications/send-user', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                alert('✅ Уведомление отправлено!');
+                this.reset();
+            } else {
+                alert('❌ Ошибка: ' + result.error);
+            }
+        });
+    });
+    
+    document.getElementById('broadcastForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!confirm('Отправить рассылку всем пользователям?')) return;
+        
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+        
+        fetch('/notifications/broadcast', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                alert('✅ Рассылка добавлена в очередь!');
+                this.reset();
+            } else {
+                alert('❌ Ошибка: ' + result.error);
+            }
+        });
+    });
+</script>
+{% endblock %}

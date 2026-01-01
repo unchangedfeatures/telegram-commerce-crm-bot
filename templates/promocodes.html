@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Промокоды - PewPuff Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-ticket-perforated"></i> Промокоды</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createPromoModal">
+        <i class="bi bi-plus-circle"></i> Создать промокод
+    </button>
+</div>
+
+<div class="table-container">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Код</th>
+                <th>Скидка</th>
+                <th>Мин. заказ</th>
+                <th>Использовано</th>
+                <th>Истекает</th>
+                <th>Статус</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for promo in promocodes %}
+            <tr>
+                <td><code>{{ promo.code }}</code></td>
+                <td>
+                    {% if promo.discount_percent %}
+                        {{ promo.discount_percent }}%
+                    {% elif promo.discount_amount %}
+                        {{ promo.discount_amount }}€
+                    {% endif %}
+                </td>
+                <td>{{ promo.min_order_amount or 0 }}€</td>
+                <td>
+                    {{ promo.current_uses }} / 
+                    {% if promo.max_uses == 0 %}∞{% else %}{{ promo.max_uses }}{% endif %}
+                </td>
+                <td>
+                    {% if promo.expires_at %}
+                        {{ promo.expires_at.strftime('%d.%m.%Y') }}
+                    {% else %}
+                        <span class="text-muted">Бессрочно</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if promo.is_active %}
+                        <span class="badge bg-success">Активен</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Неактивен</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="togglePromo({{ promo.promo_id }})">
+                        <i class="bi bi-power"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deletePromo({{ promo.promo_id }})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Модальное окно создания промокода -->
+<div class="modal fade" id="createPromoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создать промокод</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createPromoForm">
+                    <div class="mb-3">
+                        <label class="form-label">Код промокода</label>
+                        <input type="text" class="form-control" name="code" required>
+                        <small class="text-muted">Будет автоматически в верхнем регистре</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Тип скидки</label>
+                        <select class="form-select" name="type" id="discountType" required>
+                            <option value="percent">Процент</option>
+                            <option value="amount">Фиксированная сумма</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="percentField">
+                        <label class="form-label">Процент скидки</label>
+                        <input type="number" class="form-control" name="discount_percent" min="1" max="100">
+                    </div>
+                    
+                    <div class="mb-3 d-none" id="amountField">
+                        <label class="form-label">Сумма скидки (€)</label>
+                        <input type="number" class="form-control" name="discount_amount" min="0.01" step="0.01">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Минимальная сумма заказа (€)</label>
+                        <input type="number" class="form-control" name="min_order" value="0" min="0" step="0.01">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Максимальное количество использований</label>
+                        <input type="number" class="form-control" name="max_uses" value="0" min="0">
+                        <small class="text-muted">0 = безлимит</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Дата истечения</label>
+                        <input type="date" class="form-control" name="expires_at">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="createPromo()">Создать</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Переключение типа скидки
+    document.getElementById('discountType').addEventListener('change', function() {
+        const percentField = document.getElementById('percentField');
+        const amountField = document.getElementById('amountField');
+        
+        if (this.value === 'percent') {
+            percentField.classList.remove('d-none');
+            amountField.classList.add('d-none');
+        } else {
+            percentField.classList.add('d-none');
+            amountField.classList.remove('d-none');
+        }
+    });
+    
+    function createPromo() {
+        const form = document.getElementById('createPromoForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        fetch('/promocodes/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + result.error);
+            }
+        });
+    }
+    
+    function togglePromo(promoId) {
+        fetch(`/promocodes/toggle/${promoId}`, {method: 'POST'})
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) location.reload();
+        });
+    }
+    
+    function deletePromo(promoId) {
+        if (confirm('Удалить промокод?')) {
+            fetch(`/promocodes/delete/${promoId}`, {method: 'POST'})
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) location.reload();
+            });
+        }
+    }
+</script>
+{% endblock %}

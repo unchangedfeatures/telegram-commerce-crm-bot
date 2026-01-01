@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Дашборд - PewPuff Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Дашборд</h2>
+    <div class="text-muted">
+        <i class="bi bi-calendar"></i> {{ now().strftime('%d.%m.%Y %H:%M') }}
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Всего пользователей</div>
+                    <h3 class="mb-0">{{ stats.total_users or 0 }}</h3>
+                </div>
+                <div class="icon bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-people"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Всего заказов</div>
+                    <h3 class="mb-0">{{ stats.total_orders or 0 }}</h3>
+                </div>
+                <div class="icon bg-success bg-opacity-10 text-success">
+                    <i class="bi bi-bag"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Ожидают</div>
+                    <h3 class="mb-0">{{ stats.pending_orders or 0 }}</h3>
+                </div>
+                <div class="icon bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-clock"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Общий доход</div>
+                    <h3 class="mb-0">{{ "%.2f"|format(stats.total_revenue or 0) }}€</h3>
+                </div>
+                <div class="icon bg-info bg-opacity-10 text-info">
+                    <i class="bi bi-currency-euro"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h5 class="mb-3">📊 Сегодня</h5>
+            <div class="row">
+                <div class="col-6">
+                    <div class="text-muted small">Заказов</div>
+                    <h4>{{ stats.today_orders or 0 }}</h4>
+                </div>
+                <div class="col-6">
+                    <div class="text-muted small">Доход</div>
+                    <h4>{{ "%.2f"|format(stats.today_revenue or 0) }}€</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h5 class="mb-3">🔥 Топ товары</h5>
+            <div class="list-group list-group-flush">
+                {% for product in stats.top_products[:5] %}
+                <div class="list-group-item px-0 border-0">
+                    <div class="d-flex justify-content-between">
+                        <span>{{ product.product_name }}</span>
+                        <span class="badge bg-primary">{{ product.times_chosen }} продаж</span>
+                    </div>
+                    <small class="text-muted">На складе: {{ product.stock_quantity }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="table-container">
+            <h5 class="mb-3">Быстрые действия</h5>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('orders', status='pending') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-clock"></i> Ожидающие заказы
+                </a>
+                <a href="{{ url_for('notifications') }}" class="btn btn-outline-success">
+                    <i class="bi bi-bell"></i> Отправить уведомление
+                </a>
+                <a href="{{ url_for('products') }}" class="btn btn-outline-info">
+                    <i class="bi bi-box"></i> Управление товарами
+                </a>
+                <a href="{{ url_for('promocodes') }}" class="btn btn-outline-warning">
+                    <i class="bi bi-ticket"></i> Промокоды
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Автообновление каждые 30 секунд
+    setInterval(() => {
+        location.reload();
+    }, 30000);
+</script>
+{% endblock %}
