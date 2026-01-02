@@ -12,7 +12,7 @@ import config
 import aiohttp
 import asyncio
 from typing import Optional
-
+from decimal import Decimal
 
 router = Router()
 
@@ -175,12 +175,14 @@ async def start_checkout(callback: types.CallbackQuery, state: FSMContext):
         return
     
     # НОВАЯ ПРОВЕРКА #2: Количество активных заказов пользователя
-    active_orders_count = await db.fetchval("""
-        SELECT COUNT(*) 
-        FROM orders 
-        WHERE telegram_id = $1 
-          AND status IN ('pending', 'accepted', 'delivery')
-    """, user_id)
+    rows = await db.fetch("""
+        SELECT order_id
+        FROM orders
+        WHERE telegram_id = $1
+            AND status IN ('pending', 'accepted', 'delivery')
+            FOR UPDATE
+        """, user_id)
+    active_orders_count = len(rows)
     
     if active_orders_count >= 2:
         await callback.answer(
@@ -1082,13 +1084,14 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                     return
                 
                 # ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА #2: Количество активных заказов
-                active_orders_count = await conn.fetchval("""
-                    SELECT COUNT(*) 
-                    FROM orders 
-                    WHERE telegram_id = $1 
-                      AND status IN ('pending', 'accepted', 'delivery')
+                rows = await db.fetch("""
+                    SELECT order_id
+                    FROM orders
+                    WHERE telegram_id = $1
+                        AND status IN ('pending', 'accepted', 'delivery')
                     FOR UPDATE
                 """, user_id)
+                active_orders_count = len(rows)
                 
                 if active_orders_count >= 2:
                     await callback.answer(
@@ -1184,7 +1187,7 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                             break
                         
                         deduct = min(remaining, bonus['discount_amount'])
-                        new_amount = bonus['discount_amount'] - deduct
+                        new_amount = bonus['discount_amount'] - Decimal(deduct)
                         
                         await conn.execute("""
                             UPDATE referral_discounts 
