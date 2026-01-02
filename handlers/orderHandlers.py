@@ -78,27 +78,28 @@ async def reverse_geocode(latitude: float, longitude: float) -> Optional[str]:
         return None
 
 # Вспомогательные функции
-async def format_order_text(items: dict, discount_amount: float = 0, 
-                          final_amount: float = 0, promo_code: str = None, delivery_cost: float = 0) -> str:
-    """Форматирует текст заказа"""
+async def format_order_text(items: dict, discount_amount: float = 0,
+                          promo_code: str = None, delivery_cost: float = 0) -> str:
+    """Форматирует текст заказа, производя все расчеты внутри."""
     text = "🛒 *Ваш заказ:*\n\n"
     total_amount = 0
-    
+
     for product_id, item in items.items():
         item_total = item['price'] * item['quantity']
         total_amount += item_total
         text += f"• {item['name']}: {item['quantity']} × {item['price']}€ = {item_total:.2f}€\n"
-    
-    text += f"\n💰 *Сумма: {total_amount:.2f}€*\n"
-    
+
+    text += f"\n💰 *Сумма товаров: {total_amount:.2f}€*\n"
+
     if delivery_cost > 0:
         text += f"🚚 *Доставка: {delivery_cost:.2f}€*\n"
     if promo_code and promo_code != "none":
         text += f"🎁 *Промокод: {promo_code}*\n"
         text += f"💸 *Скидка: -{discount_amount:.2f}€*\n"
-    
-    text += f"💵 *К оплате: {(final_amount + delivery_cost):.2f}€*\n"
-    
+
+    final_total = total_amount - discount_amount + delivery_cost
+    text += f"\n💵 *Итого к оплате: {final_total:.2f}€*\n"
+
     return text
 
 async def calculate_discount(promo_code: str, total_amount: float, user_id: int = None):
@@ -534,18 +535,17 @@ async def back_to_promos(callback: types.CallbackQuery, state: FSMContext):
 async def process_request_address(callback: types.CallbackQuery, state: FSMContext):
     """Запрос адреса доставки"""
     data = await state.get_data()
-    
+
     # Рассчитываем стоимость доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
     delivery_cost = 0 if total_items >= 4 else 1.0
-    
+
     # Формируем текст заказа
     order_text = await format_order_text(
-        data['items'], 
-        data.get('discount_amount', 0), 
-        data.get('final_amount', data['total_amount']) + delivery_cost,  # ИСПРАВЛЕНИЕ: добавляем доставку
-        data.get('promo_code'),
-        delivery_cost
+        data['items'],
+        discount_amount=data.get('discount_amount', 0),
+        promo_code=data.get('promo_code'),
+        delivery_cost=delivery_cost
     )
     
     # Контактная информация (ИСПРАВЛЕНИЕ: экранируем специальные символы)
@@ -955,22 +955,21 @@ async def handle_add_free_delivery(callback: types.CallbackQuery, state: FSMCont
 async def confirm_order(event, state: FSMContext):
     """Подтверждение заказа"""
     data = await state.get_data()
-    
+
     # Рассчитываем стоимость доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
     delivery_cost = 0 if total_items >= 4 else 1.0
-    
-    # Обновляем финальную сумму с доставкой
-    final_amount = data.get('final_amount', data['total_amount']) + delivery_cost
-    
+
+    # Обновляем состояние с стоимостью доставки
+    await state.update_data(delivery_cost=delivery_cost)
+
     # Формируем текст заказа
     order_text = "✅ *Подтверждение заказа*\n\n"
     order_text += await format_order_text(
-        data['items'], 
-        data.get('discount_amount', 0), 
-        final_amount, 
-        data.get('promo_code'),
-        delivery_cost
+        data['items'],
+        discount_amount=data.get('discount_amount', 0),
+        promo_code=data.get('promo_code'),
+        delivery_cost=delivery_cost
     )
     
     # Информация о доставке
