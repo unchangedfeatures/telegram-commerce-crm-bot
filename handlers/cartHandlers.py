@@ -395,19 +395,19 @@ async def view_cart(callback: types.CallbackQuery):
     # Формируем сообщение с содержимым корзины
     cart_text = "🛒 *Ваша корзина*\n\n"
     total_price = 0
-    
+
     for product_id, item in items.items():
         item_total = item['price'] * item['quantity']
         total_price += item_total
-        
+
         cart_text += (
             f"• {item['name']}\n"
-            f"  Количество: {item['quantity']} × {item['price']}€ = {item_total:.2f}€\n"
+            f"  `{item['quantity']} шт × {item['price']:.2f}€ = {item_total:.2f}€`\n"
         )
-    
-    cart_text += f"\n💰 *Сумма: {total_price:.2f}€*\n"
+
+    cart_text += f"\n💰 *Сумма товаров: {total_price:.2f}€*\n"
     cart_text += f"🚚 *Доставка: {delivery_cost:.2f}€*\n"
-    cart_text += f"💵 *Итого к оплате: {(total_price + delivery_cost):.2f}€*"
+    cart_text += f"💵 *Итого к оплате: {(total_price + delivery_cost):.2f}€*\n"
     
     # Создаем кнопки управления корзиной
     keyboard_buttons = []
