@@ -1,0 +1,6 @@
+aiogram
+Flask
+asyncpg
+python-dotenv
+Werkzeug
+aiohttp
