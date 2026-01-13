@@ -17,7 +17,7 @@ notification_service = None
 
 # Конфигурация
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD_HASH = generate_password_hash("pewpuff_admin")  # Измените пароль!
+ADMIN_PASSWORD_HASH = generate_password_hash("YOUR PASSWORD")  # Измените пароль!
 
 # Глобальный event loop для async операций
 loop = None
