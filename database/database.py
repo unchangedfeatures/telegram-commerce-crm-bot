@@ -11,16 +11,16 @@ async def init_db():
     if pool is None:
         pool = await asyncpg.create_pool(
             user="postgres",
-            password="pewpuff_admin",
-            database="pewpuff",
+            password="INSERT YOUR DATA",
+            database="INSERT YOUR DATA",
             host="localhost",
             port=5432,
-            min_size=2,  # Увеличено с 1
-            max_size=20,  # Увеличено с 10 для 200 посещений
-            command_timeout=60,  # Таймаут команд
-            max_queries=50000,  # Максимум запросов на соединение
-            max_cached_statement_lifetime=300,  # Кэш prepared statements
-            max_cacheable_statement_size=1024 * 15,  # Размер кэша
+            min_size=2, 
+            max_size=20,  
+            command_timeout=60,  
+            max_queries=50000,  
+            max_cached_statement_lifetime=300,  
+            max_cacheable_statement_size=1024 * 15,  
             max_inactive_connection_lifetime=300
         )
 
