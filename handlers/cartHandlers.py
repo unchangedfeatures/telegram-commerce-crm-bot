@@ -87,7 +87,7 @@ async def hqd_flavors_v2(callback: types.CallbackQuery):
 @router.callback_query(F.data.startswith("product_detail:"))
 async def product_detail(callback: types.CallbackQuery):
     product_id = int(callback.data.split(":")[1])
-    
+    telegram_id = callback.from_user.id
     product = await db.fetchrow(
         """
         SELECT product_id, product_name, stock_quantity, price, 
@@ -97,36 +97,39 @@ async def product_detail(callback: types.CallbackQuery):
         """,
         product_id
     )
-    
     if not product:
         await callback.answer("Товар не найден", show_alert=True)
         return
-    
+
     stock = product['stock_quantity'] or 0
     price = product['price'] or 0
     description = product['description'] or "Описание отсутствует"
-    
-    # Определяем доступность
+
+#    Определяем доступность
     if stock > 0:
-        availability = f"✅ В наличии: {stock} шт."
+        availability = f"*✅ {stock} шт. в наличии!*"
         add_to_cart_button = InlineKeyboardButton(
             text="➕ Добавить в корзину",
             callback_data=f"add_to_cart:{product_id}"
         )
     else:
-        availability = "❌ Нет в наличии"
+        availability = "*❌ Нет в наличии*"
         add_to_cart_button = InlineKeyboardButton(
             text="❌ Недоступно",
             callback_data="unavailable"
         )
-    
-    # Создаем клавиатуру
+
+
+# Базовый ряд кнопок (всегда показывается)
+    buttons_row = [
+        InlineKeyboardButton(text="🛒 Корзина", callback_data="cart"),
+        InlineKeyboardButton(text="📋 Список товаров", callback_data="hqd")
+    ]
+
+# Создаем клавиатуру
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [add_to_cart_button],
-        [
-            InlineKeyboardButton(text="🛒 Корзина", callback_data="cart"),
-            InlineKeyboardButton(text="📋 Список товаров", callback_data="hqd")
-        ],
+        buttons_row,
         [InlineKeyboardButton(text="🔙 Назад", callback_data="hqd")]
     ])
     
@@ -138,17 +141,17 @@ async def product_detail(callback: types.CallbackQuery):
         LIMIT 1
     """, callback.from_user.id, product_id)
     
-    tried_text = "🍓 Вы уже пробовали этот вкус!" if tried else ""
+    tried_text = "*🍓 Пробовали этот вкус ранее*\n" if tried else ""
     
     # Формируем текст сообщения
-    caption = f"🛍️ *{product['product_name']}*\n\n"
-    caption += f"💰 Цена: {price}€\n"
-    caption += f"📦 {availability}\n"
-    if description:
-        caption += f"📝 {description}\n"
+    caption = f"🔷 *{product['product_name']}*\n\n"
+    caption += f"💎 *Цена: {price}€*\n"
+    caption += f"{availability}\n"
+    #if description:
+        #caption += f"📝 {description}\n"
     if tried_text:
-        caption += f"\n{tried_text}\n"
-    caption += f"\n📊 Выбрано раз: {product['times_chosen'] or 0}"
+        caption += f"\n{tried_text}"
+    caption += f"*\n📊 Выбрали {product['times_chosen'] or 0} раз(а)*"
     
     # Отправляем фото с подписью и клавиатурой
     await callback.message.delete()
@@ -172,7 +175,6 @@ async def product_detail(callback: types.CallbackQuery):
 async def add_to_cart(callback: types.CallbackQuery):
     telegram_id = callback.from_user.id
     product_id = int(callback.data.split(":")[1])
-    
     # Получаем информацию о товаре
     product = await db.fetchrow(
         """
@@ -401,13 +403,15 @@ async def view_cart(callback: types.CallbackQuery):
         total_price += item_total
 
         cart_text += (
-            f"• {item['name']}\n"
+            f"*• {item['name']}\n*"
             f"  `{item['quantity']} шт × {item['price']:.2f}€ = {item_total:.2f}€`\n"
         )
 
     cart_text += f"\n💰 *Сумма товаров: {total_price:.2f}€*\n"
     cart_text += f"🚚 *Доставка: {delivery_cost:.2f}€*\n"
-    cart_text += f"💵 *Итого к оплате: {(total_price + delivery_cost):.2f}€*\n"
+    if delivery_cost != 0:
+        cart_text += f"(Закажите от 4х товаров и получите бесплатную доставку!)\n"
+    cart_text += f"*\n💵Итого к оплате: {(total_price + delivery_cost):.2f}€*\n"
     
     # Создаем кнопки управления корзиной
     keyboard_buttons = []
@@ -502,11 +506,11 @@ async def edit_cart_item(callback: types.CallbackQuery):
     item_total = item['price'] * item['quantity']
     
     text = (
-        f"✏️ <b>Редактирование товара</b>\n\n"
-        f"<b>{item['name']}</b>\n"
-        f"💰 Цена за единицу: {item['price']}€\n"
-        f"📦 Количество: <b>{item['quantity']}</b>\n"
-        f"💰 Итого за товар: {item_total:.2f}€\n\n"
+        f"✏️ *Редактирование товара*\n\n"
+        f"*{item['name']}*\n"
+        f"💰 Цена за единицу: *{item['price']}€*\n"
+        f"📦 Количество: *{item['quantity']}*\n"
+        f"📝 Итого за товар: *{item_total:.2f}€*\n\n"
         f"Используйте кнопки для изменения количества:"
     )
     
@@ -615,7 +619,7 @@ async def clear_cart(callback: types.CallbackQuery):
     ])
     
     await callback.message.edit_text(
-        "⚠️ <b>Вы уверены, что хотите очистить корзину?</b>\n\n"
+        "⚠️ *Вы уверены, что хотите очистить корзину?*\n\n"
         "Все добавленные товары будут удалены.",
         reply_markup=keyboard,
         parse_mode="Markdown"

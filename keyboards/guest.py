@@ -8,7 +8,7 @@ from aiogram import types
 back_button = InlineKeyboardButton(text="НАЗАД 🔙", callback_data="back")
 
 #Кнопки меню
-catalogue_button = InlineKeyboardButton(text="ЗАКАЗАТЬ ✨", callback_data="catalogue")
+catalogue_button = InlineKeyboardButton(text="ЗАКАЗАТЬ ✨", callback_data="hqd")
 promo_button = InlineKeyboardButton(text="АКЦИИ 🔥", callback_data="promo")
 cart_button = InlineKeyboardButton(text="КОРЗИНА 🛒", callback_data="cart")
 help_button = InlineKeyboardButton(text="ИНФО ℹ️", callback_data="help")
@@ -30,7 +30,7 @@ def main_menu_keyboard():
 #Кнопки помощи
 pay_questions_button = InlineKeyboardButton(text="ОПЛАТА 💳", callback_data="pay_questions")
 delivery_questions_button = InlineKeyboardButton(text="ДОСТАВКА 🚚", callback_data="delivery")
-contact_support_button = InlineKeyboardButton(text="Связь 📞", callback_data="contact_support")
+contact_support_button = InlineKeyboardButton(text="СВЯЗЬ 📞", callback_data="contact_support")
 
 
 #Меню помощи
@@ -45,7 +45,7 @@ def help_menu_keyboard():
 
 # Кнопки каталога
 
-brands_button = InlineKeyboardButton(text="HQD !", callback_data="hqd")
+brands_button = InlineKeyboardButton(text="HQD 🏷️", callback_data="hqd")
 promo_choice_button = InlineKeyboardButton(text="ПО СКИДКЕ 🔥", callback_data="promo_choice")
 promo_brand_items = InlineKeyboardButton(text="НАШ КАНАЛ С ВЕЩАМИ 🏷️", callback_data="vinted")
 
@@ -54,7 +54,6 @@ def catalogue_menu_keyboard():
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [brands_button],
-            [promo_brand_items],
             [back_button],
         ]
     )
@@ -102,7 +101,7 @@ def invite_menu_keyboard():
 
 
 # Кнопки акций
-promo_item_1_button = InlineKeyboardButton(text="ПЕРЕЙТИ К ЗАКАЗУ ✨", callback_data="promo_choice")
+promo_item_1_button = InlineKeyboardButton(text="ПЕРЕЙТИ К ЗАКАЗУ ✨", callback_data="hqd")
 # Меню акций
 def promo_menu_keyboard():
     keyboard = InlineKeyboardMarkup(

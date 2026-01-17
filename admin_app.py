@@ -17,7 +17,7 @@ notification_service = None
 
 # Конфигурация
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD_HASH = generate_password_hash("YOUR PASSWORD")  # Измените пароль!
+ADMIN_PASSWORD_HASH = generate_password_hash("pewpuff_admin")  # Измените пароль!
 
 # Глобальный event loop для async операций
 loop = None
@@ -695,4 +695,4 @@ if __name__ == '__main__':
     init_async()
     
     # Запуск Flask
-    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
+    app.run(debug=False, host='0.0.0.0', port=5000, threaded=True)

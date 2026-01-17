@@ -2,11 +2,13 @@ import aiogram
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.types import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.enums import ParseMode
 import keyboards.guest as guest
 import database.database as db
 from aiogram.fsm.context import FSMContext
 from bot_instance import bot_instance, notification_service
 from config import USERNAME
+from texts import texts
 
 router = Router()
 
@@ -65,8 +67,8 @@ async def start_message(message: types.Message, state: FSMContext):
     await register_user(message.from_user, referred_by_telegram_id)
     
     await message.answer(
-        text="Welcome to PewPuff Bot! Use the menu below to navigate.",
-        reply_markup=guest.main_menu_keyboard()
+        text=texts.welcome_text,
+        reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
     )
     await state.clear()
 
@@ -93,8 +95,8 @@ async def check_subscription_handler(callback: types.CallbackQuery, state: FSMCo
         await register_user(callback.from_user, referred_by_telegram_id)
         
         await callback.message.answer(
-            text="Welcome to PewPuff Bot! Use the menu below to navigate.",
-            reply_markup=guest.main_menu_keyboard()
+            text=texts.welcome_text,
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
         )
         
         # Очищаем состояние
@@ -191,8 +193,8 @@ async def back_button(callback: types.CallbackQuery):
     try:
         # ИСПРАВЛЕНИЕ: Пытаемся отредактировать текст
         await callback.message.edit_text(
-            text="Welcome to PewPuff Bot! Use the menu below to navigate.",
-            reply_markup=guest.main_menu_keyboard()
+            text=texts.welcome_text,
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
         )
         await callback.answer()
     except Exception:
@@ -203,8 +205,8 @@ async def back_button(callback: types.CallbackQuery):
             pass
         
         await callback.message.answer(
-            text="Welcome to PewPuff Bot! Use the menu below to navigate.",
-            reply_markup=guest.main_menu_keyboard()
+            text=texts.welcome_text,
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
         )
         await callback.answer()
 
@@ -213,8 +215,8 @@ async def help_menu(callback: types.CallbackQuery):
     """Меню помощи"""
     try:
         await callback.message.edit_text(
-            text="Here is the help menu. Choose an option below.",
-            reply_markup=guest.help_menu_keyboard()
+            text=texts.help_menu_text,
+            reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
         )
         await callback.answer()
     except Exception:
@@ -224,8 +226,8 @@ async def help_menu(callback: types.CallbackQuery):
             pass
         
         await callback.message.answer(
-            text="Here is the help menu. Choose an option below.",
-            reply_markup=guest.help_menu_keyboard()
+            text=texts.help_menu_text,
+            reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
         )
         await callback.answer()
 
@@ -235,7 +237,7 @@ async def main_menu_handler(callback: types.CallbackQuery):
     try:
         await callback.message.edit_text(
             text="🏠 Главное меню",
-            reply_markup=guest.main_menu_keyboard()
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
         )
         await callback.answer()
     except Exception:
@@ -247,7 +249,7 @@ async def main_menu_handler(callback: types.CallbackQuery):
         
         await callback.message.answer(
             text="🏠 Главное меню",
-            reply_markup=guest.main_menu_keyboard()
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
         )
         await callback.answer()
 
@@ -364,36 +366,16 @@ async def profile_menu(callback: types.CallbackQuery):
     earned_from_friends = float(earned_from_friends)
     
     # Формируем текст профиля
-    text = "👤 *Ваш профиль*\n\n"
-    
-    if favorite_product:
-        text += f"🍓 Твой любимый вкус: {favorite_product}!\n"
-    
-    text += f"🧪 Попробовано с нами {tried_count} вкусов!"
-    if tried_count > 5:
-        text += " 🏆 Гурман"
-    text += "\n"
-    
-    text += f"📅 С нами уже {days_since_reg} дней"
-    if days_since_reg > 30:
-        text += " 🏅 Ветеран"
-    text += "\n"
-    
-    text += f"👥 Приглашено {friends_invited} друзей"
-    if friends_invited > 5:
-        text += " 🌟 Сетевой маркетолог"
-    text += "\n"
-    
-    text += f"💰 Получено {earned_from_friends:.2f}€ с друзей!!!"
-    if earned_from_friends > 50:
-        text += " 💎 Миллионер"
-    text += "\n"
-    
     try:
         await callback.message.edit_text(
-            text=text,
+            text=texts.get_profile_text(
+        favorite_product,
+        tried_count,
+        days_since_reg,
+        friends_invited,
+        earned_from_friends),
             reply_markup=guest.profile_menu_keyboard(),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
         await callback.answer()
     except Exception:
@@ -403,9 +385,14 @@ async def profile_menu(callback: types.CallbackQuery):
             pass
         
         await callback.message.answer(
-            text=text,
+            text=texts.get_profile_text(
+        favorite_product,
+        tried_count,
+        days_since_reg,
+        friends_invited,
+        earned_from_friends),
             reply_markup=guest.profile_menu_keyboard(),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
         await callback.answer()
 
@@ -454,41 +441,27 @@ async def invite_menu(callback: types.CallbackQuery):
     """, callback.from_user.id)
     referral_bonus = float(referral_bonus) if referral_bonus else 0.0
     
-    text = f"Invite your friends to join PewPuff Bot! Share your referral link:\n{ref_link}\n\n"
-    text += f"💰 Your current referral bonus: {referral_bonus:.2f}€"
     
     await callback.message.edit_text(
-        text=text,
-        reply_markup=guest.invite_menu_keyboard()
+        text=texts.get_referral_text(ref_link, referral_bonus),
+        reply_markup=guest.invite_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
     )
     await callback.answer()
 
 @router.callback_query(F.data == "pay_questions")
 async def pay_questions_menu(callback: types.CallbackQuery):
-    text = "💳 *Часто задаваемые вопросы по оплате:*\n\n" \
-           "• Оплата производится после подтверждения заказа\n" \
-           "• Принимаем банковские карты и другие способы\n" \
-           "• Безопасная оплата через защищенные каналы\n" \
-           "• Возврат средств в случае проблем с заказом\n\n" \
-           "Если у вас есть вопросы, свяжитесь с поддержкой."
     await callback.message.edit_text(
-        text=text,
-        reply_markup=guest.help_menu_keyboard(),
+        text=texts.payment_text,
+        reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
         
     )
     await callback.answer()
 
 @router.callback_query(F.data == "delivery")
 async def delivery_questions_menu(callback: types.CallbackQuery):
-    text = "🚚 *Часто задаваемые вопросы по доставке:*\n\n" \
-           "• Доставка осуществляется в течение 30-60 минут\n" \
-           "• Бесплатная доставка при заказе от 4 товаров\n" \
-           "• Стоимость доставки - 1€ при меньшем количестве\n" \
-           "• Отслеживание статуса заказа в профиле\n\n" \
-           "Если у вас есть вопросы, свяжитесь с поддержкой."
     await callback.message.edit_text(
-        text=text,
-        reply_markup=guest.help_menu_keyboard(),
+        text=texts.delivery_text,
+        reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
         
     )
     await callback.answer()
@@ -496,18 +469,13 @@ async def delivery_questions_menu(callback: types.CallbackQuery):
 @router.callback_query(F.data == "contact_support")
 async def contact_support_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(
-        text="You can contact our support team at @PewPuff_support",
-        reply_markup=guest.help_menu_keyboard()
+        text=texts.contact_text,
+        reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
     )
     await callback.answer()
 
-@router.callback_query(F.data == "tastes_help")
-async def tastes_help_menu(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        text="Let our AI help you choose the best tastes!",
-        reply_markup=guest.catalogue_menu_keyboard()
-    )
-    await callback.answer()
+# Depricated!
+#Не используется
 
 @router.callback_query(F.data == "brands")
 async def brands_menu(callback: types.CallbackQuery):

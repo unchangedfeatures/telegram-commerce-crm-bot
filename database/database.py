@@ -11,8 +11,8 @@ async def init_db():
     if pool is None:
         pool = await asyncpg.create_pool(
             user="postgres",
-            password="INSERT YOUR DATA",
-            database="INSERT YOUR DATA",
+            password="pewpuff_admin",
+            database="pewpuff",
             host="localhost",
             port=5432,
             min_size=2, 
