@@ -41,13 +41,13 @@ delivery_text = (
     "2. Курьер звонит/пишет\n"
     "3. Обсуждаете удобное время/место\n"
     "4. Получаете товар\n\n"
-    "📞 Уточнить: @PewPuff_support"
+    "📞 Уточнить: @PewPuff\\_support"
 )
 
 # 📞 Связь
 contact_text = (
     "📞 *Связь*\n\n"
-    "💬 Поддержка: @PewPuff_support\n"
+    "💬 Поддержка: @PewPuff\\_support\n"
     "⏰ *10:00-22:00* (ежедневно)\n"
     "⚡ Ответ за *15 минут*\n\n"
     "📌 *По вопросам:*\n"
@@ -93,8 +93,6 @@ def get_profile_text(
 👤 *Ваш профиль*
 
 📊 *Статистика:*
-• Любимый вкус: {favorite_product if favorite_product else "—"}
-• Попробовано вкусов: {tried_count}
-• С нами уже: {days_since_reg} дней
-• Приглашено друзей: {friends_invited}
+*• С нами уже: {days_since_reg} дней*
+*• Приглашено друзей: {friends_invited}*
 """
