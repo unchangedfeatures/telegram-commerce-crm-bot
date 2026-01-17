@@ -290,14 +290,14 @@ async def promo_menu(callback: types.CallbackQuery):
         description = promo["description"]
     else:
         banner_url = "https://osgf.gov.ng/storage/temp/oc64663771bc022/assets/images/no-banner.jpg"
-        description = "No current promotions available."
+        description = texts.promo_action_text
     
     # ИСПРАВЛЕНИЕ #2: Правильная обработка медиа
     try:
         # Пытаемся отредактировать как медиа
         await callback.message.edit_media(
             media=InputMediaPhoto(media=banner_url, caption=description),
-            reply_markup=guest.promo_menu_keyboard()
+            reply_markup=guest.promo_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         )
         await callback.answer()
     except Exception as e:
@@ -309,7 +309,8 @@ async def promo_menu(callback: types.CallbackQuery):
         
         await callback.message.answer_photo(
             photo=banner_url,
-            caption=description,
+            caption=description, 
+            parse_mode=ParseMode.MARKDOWN,
             reply_markup=guest.promo_menu_keyboard()
         )
         await callback.answer()
