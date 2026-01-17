@@ -78,28 +78,39 @@ async def reverse_geocode(latitude: float, longitude: float) -> Optional[str]:
         return None
 
 # Вспомогательные функции
-async def format_order_text(items: dict, discount_amount: float = 0,
-                          promo_code: str = None, delivery_cost: float = 0) -> str:
-    """Форматирует текст заказа, производя все расчеты внутри."""
+async def format_order_text(items: dict, discount_amount: float = 0, 
+                          final_amount: float = 0, promo_code: str = None, 
+                          delivery_cost: float = 0) -> str:
+    """Форматирует текст заказа"""
     text = "🛒 *Ваш заказ:*\n\n"
     total_amount = 0
-
+    
     for product_id, item in items.items():
         item_total = item['price'] * item['quantity']
         total_amount += item_total
         text += f"• {item['name']}: {item['quantity']} × {item['price']}€ = {item_total:.2f}€\n"
-
+    
     text += f"\n💰 *Сумма товаров: {total_amount:.2f}€*\n"
-
+    
+    # Добавляем доставку, если она не нулевая
     if delivery_cost > 0:
         text += f"🚚 *Доставка: {delivery_cost:.2f}€*\n"
-    if promo_code and promo_code != "none":
-        text += f"🎁 *Промокод: {promo_code}*\n"
+    else:
+        text += f"🚚 *Доставка: БЕСПЛАТНО* (от 4 товаров)\n"
+    
+    # Показываем промокод и скидку только если они действительно есть
+    if promo_code and promo_code not in ["none", None] and discount_amount > 0:
+        # Определяем тип промокода
+        if promo_code == "referral":
+            text += f"🎁 *Реферальный бонус*\n"
+        else:
+            text += f"🎁 *Промокод: {promo_code}*\n"
+        
         text += f"💸 *Скидка: -{discount_amount:.2f}€*\n"
-
-    final_total = total_amount - discount_amount + delivery_cost
-    text += f"\n💵 *Итого к оплате: {final_total:.2f}€*\n"
-
+    
+    # Итого к оплате (финальная сумма уже включает доставку и скидку)
+    text += f"💵 *Итого к оплате: {final_amount:.2f}€*\n"
+    
     return text
 
 async def calculate_discount(promo_code: str, total_amount: float, user_id: int = None):
@@ -286,8 +297,14 @@ async def show_promo_selection(callback: types.CallbackQuery, state: FSMContext)
     total_items = sum(item['quantity'] for item in data['items'].values())
     delivery_cost = 0 if total_items >= 4 else 1.0
     
-    # Формируем текст
-    order_text = await format_order_text(data['items'], 0, total_amount, delivery_cost=delivery_cost)
+    # ИСПРАВЛЕНИЕ: Правильный вызов format_order_text
+    order_text = await format_order_text(
+        items=data['items'], 
+        discount_amount=0,  # Пока нет скидки
+        final_amount=total_amount + delivery_cost,  # Сумма + доставка
+        promo_code=None,  # Промокод еще не выбран
+        delivery_cost=delivery_cost
+    )
     order_text += "\n\n*Выберите промокод для применения:*"
     
     await callback.message.edit_text(
@@ -339,13 +356,13 @@ async def request_phone(callback: types.CallbackQuery, state: FSMContext):
     total_items = sum(item['quantity'] for item in data['items'].values())
     delivery_cost = 0 if total_items >= 4 else 1.0
     
-    # Формируем текст заказа
+    # ИСПРАВЛЕНИЕ: Правильный вызов format_order_text
     order_text = await format_order_text(
-        data['items'], 
-        data.get('discount_amount', 0), 
-        data.get('final_amount', data['total_amount']), 
-        data.get('promo_code'),
-        delivery_cost
+        items=data['items'], 
+        discount_amount=data.get('discount_amount', 0), 
+        final_amount=data.get('final_amount', data['total_amount']) + delivery_cost,
+        promo_code=data.get('promo_code'),
+        delivery_cost=delivery_cost
     )
     
     buttons = []
@@ -382,7 +399,6 @@ async def request_phone(callback: types.CallbackQuery, state: FSMContext):
     )
     
     await state.set_state(OrderStates.enter_phone)
-
 @router.callback_query(F.data == "use_existing_phone", OrderStates.enter_phone)
 async def use_existing_phone(callback: types.CallbackQuery, state: FSMContext):
     """Использование сохраненного номера телефона"""
@@ -730,7 +746,7 @@ async def handle_location_input(message: types.Message, state: FSMContext):
         reply_markup=types.ReplyKeyboardRemove()
     )
     
-    # Переходим к подтверждению
+    # ИСПРАВЛЕНИЕ: Переходим к подтверждению
     await confirm_order(message, state)
 
 @router.message(F.text == "❌ Отмена", OrderStates.enter_address)
@@ -832,7 +848,7 @@ async def use_saved_address_handler(callback: types.CallbackQuery, state: FSMCon
         address_text=address_text
     )
     
-    # Переходим к подтверждению
+    # ИСПРАВЛЕНИЕ: Переходим к подтверждению
     await confirm_order(callback, state)
 
 @router.message(F.text, OrderStates.enter_address)
@@ -957,19 +973,21 @@ async def handle_add_free_delivery(callback: types.CallbackQuery, state: FSMCont
 async def confirm_order(event, state: FSMContext):
     """Подтверждение заказа"""
     data = await state.get_data()
-
+    
     # Рассчитываем стоимость доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
     delivery_cost = 0 if total_items >= 4 else 1.0
-
-    # Обновляем состояние с стоимостью доставки
-    await state.update_data(delivery_cost=delivery_cost)
-
+    
+    # ИСПРАВЛЕНИЕ: Сначала рассчитываем final_amount
+    base_final_amount = data.get('final_amount', data['total_amount'])
+    final_amount = base_final_amount + delivery_cost
+    
     # Формируем текст заказа
     order_text = "✅ *Подтверждение заказа*\n\n"
     order_text += await format_order_text(
-        data['items'],
-        discount_amount=data.get('discount_amount', 0),
+        items=data['items'], 
+        discount_amount=data.get('discount_amount', 0), 
+        final_amount=final_amount, 
         promo_code=data.get('promo_code'),
         delivery_cost=delivery_cost
     )
@@ -977,10 +995,10 @@ async def confirm_order(event, state: FSMContext):
     # Информация о доставке
     order_text += f"\n📍 *Адрес доставки:*\n{data.get('address_text', 'Не указан')}\n"
     
-    # Контактная информация (ИСПРАВЛЕНИЕ: экранируем специальные символы)
+    # Контактная информация (экранируем специальные символы для Markdown)
     order_text += "\n📞 *Контактная информация:*\n"
     if data.get('username'):
-        # Экранируем @ для Markdown
+        # Экранируем _ для Markdown
         username = data['username'].replace('_', '\\_')
         order_text += f"Telegram: @{username}\n"
     if data.get('phone'):
@@ -996,6 +1014,7 @@ async def confirm_order(event, state: FSMContext):
         ],
         [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_order")]
     ])
+    
     # ИСПРАВЛЕНИЕ: правильная обработка типа события
     if isinstance(event, types.CallbackQuery):
         # Если это callback query, используем message из него
@@ -1005,8 +1024,11 @@ async def confirm_order(event, state: FSMContext):
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
-        except:
-            await event.message.delete()
+        except Exception:
+            try:
+                await event.message.delete()
+            except:
+                pass
             await event.message.answer(
                 order_text,
                 reply_markup=keyboard,
@@ -1020,15 +1042,18 @@ async def confirm_order(event, state: FSMContext):
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
-        except:
-            await event.delete()
+        except Exception:
+            try:
+                await event.delete()
+            except:
+                pass
             await event.answer(
                 order_text,
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
     
-    # Сохраняем delivery_cost в состоянии
+    # Сохраняем delivery_cost и final_amount в состоянии
     await state.update_data(final_amount=final_amount, delivery_cost=delivery_cost)
     
     await state.set_state(OrderStates.confirm_order)
@@ -1220,7 +1245,7 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
         # Уведомляем пользователя
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🏠 В главное меню", callback_data="main_menu")],
-            [InlineKeyboardButton(text="📋 Мои заказы", callback_data="my_orders")]
+            [InlineKeyboardButton(text="📋 Мои заказы", callback_data="active_orders")]
         ])
         
         await callback.message.edit_text(

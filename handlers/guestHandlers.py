@@ -68,7 +68,7 @@ async def start_message(message: types.Message, state: FSMContext):
     
     await message.answer(
         text=texts.welcome_text,
-        reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+        reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
     )
     await state.clear()
 
@@ -96,7 +96,7 @@ async def check_subscription_handler(callback: types.CallbackQuery, state: FSMCo
         
         await callback.message.answer(
             text=texts.welcome_text,
-            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         )
         
         # Очищаем состояние
@@ -194,7 +194,7 @@ async def back_button(callback: types.CallbackQuery):
         # ИСПРАВЛЕНИЕ: Пытаемся отредактировать текст
         await callback.message.edit_text(
             text=texts.welcome_text,
-            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         )
         await callback.answer()
     except Exception:
@@ -206,7 +206,7 @@ async def back_button(callback: types.CallbackQuery):
         
         await callback.message.answer(
             text=texts.welcome_text,
-            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         )
         await callback.answer()
 
@@ -216,7 +216,7 @@ async def help_menu(callback: types.CallbackQuery):
     try:
         await callback.message.edit_text(
             text=texts.help_menu_text,
-            reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+            reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         )
         await callback.answer()
     except Exception:
@@ -227,7 +227,7 @@ async def help_menu(callback: types.CallbackQuery):
         
         await callback.message.answer(
             text=texts.help_menu_text,
-            reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+            reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         )
         await callback.answer()
 
@@ -237,7 +237,7 @@ async def main_menu_handler(callback: types.CallbackQuery):
     try:
         await callback.message.edit_text(
             text="🏠 Главное меню",
-            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         )
         await callback.answer()
     except Exception:
@@ -249,7 +249,7 @@ async def main_menu_handler(callback: types.CallbackQuery):
         
         await callback.message.answer(
             text="🏠 Главное меню",
-            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+            reply_markup=guest.main_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         )
         await callback.answer()
 
@@ -375,7 +375,7 @@ async def profile_menu(callback: types.CallbackQuery):
         friends_invited,
         earned_from_friends),
             reply_markup=guest.profile_menu_keyboard(),
-            parse_mode=ParseMode.MARKDOWN_V2
+            parse_mode=ParseMode.MARKDOWN
         )
         await callback.answer()
     except Exception:
@@ -392,7 +392,7 @@ async def profile_menu(callback: types.CallbackQuery):
         friends_invited,
         earned_from_friends),
             reply_markup=guest.profile_menu_keyboard(),
-            parse_mode=ParseMode.MARKDOWN_V2
+            parse_mode=ParseMode.MARKDOWN
         )
         await callback.answer()
 
@@ -424,7 +424,7 @@ async def active_orders_menu(callback: types.CallbackQuery):
     
     await callback.message.edit_text(
         text=text,
-        reply_markup=guest.profile_menu_keyboard()
+        reply_markup=guest.profile_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
     )
     await callback.answer()
 
@@ -444,7 +444,7 @@ async def invite_menu(callback: types.CallbackQuery):
     
     await callback.message.edit_text(
         text=texts.get_referral_text(ref_link, referral_bonus),
-        reply_markup=guest.invite_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+        reply_markup=guest.invite_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
     )
     await callback.answer()
 
@@ -452,7 +452,7 @@ async def invite_menu(callback: types.CallbackQuery):
 async def pay_questions_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(
         text=texts.payment_text,
-        reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+        reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         
     )
     await callback.answer()
@@ -461,7 +461,7 @@ async def pay_questions_menu(callback: types.CallbackQuery):
 async def delivery_questions_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(
         text=texts.delivery_text,
-        reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+        reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
         
     )
     await callback.answer()
@@ -470,7 +470,7 @@ async def delivery_questions_menu(callback: types.CallbackQuery):
 async def contact_support_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(
         text=texts.contact_text,
-        reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN_V2
+        reply_markup=guest.help_menu_keyboard(), parse_mode=ParseMode.MARKDOWN
     )
     await callback.answer()
 
