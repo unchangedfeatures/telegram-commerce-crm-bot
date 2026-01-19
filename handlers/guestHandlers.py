@@ -154,31 +154,37 @@ async def register_user(user: types.User, referred_by_telegram_id: int = None):
                 
                 print(f"✅ Начислено 2€ новому пользователю {user.id} за регистрацию по реферальной ссылке")
                 
-                # Отправляем уведомление новому пользователю
-                try:
-                    await notification_service.add(
-                        user_id=user.id,
-                        text=(
-                            f"🎉 Добро пожаловать в PewPuff!\n\n"
-                            f"🎁 Вам начислено 2€ за регистрацию по реферальной ссылке!\n"
-                            f"Используйте эту скидку при оформлении первого заказа."
+                # ИСПРАВЛЕНИЕ: Проверяем что notification_service не None
+                if notification_service:
+                    try:
+                        await notification_service.add(
+                            user_id=user.id,
+                            text=(
+                                f"🎉 Добро пожаловать в PewPuff!\n\n"
+                                f"🎁 Вам начислено 2€ за регистрацию по реферальной ссылке!\n"
+                                f"Используйте эту скидку при оформлении первого заказа."
+                            )
                         )
-                    )
-                except Exception as e:
-                    print(f"Ошибка отправки уведомления новому пользователю: {e}")
+                    except Exception as e:
+                        print(f"Ошибка отправки уведомления новому пользователю: {e}")
+                else:
+                    print(f"⚠️ notification_service не инициализирован")
                 
-                # Уведомляем реферера о новой регистрации (но не о бонусе - его получит после заказа)
-                try:
-                    await notification_service.add(
-                        user_id=referred_by_telegram_id,
-                        text=(
-                            f"👥 Пользователь @{user.username or 'новый пользователь'} "
-                            f"зарегистрировался по вашей реферальной ссылке!\n\n"
-                            f"Вы получите 2€ после того, как он сделает первый заказ. 🎉"
+                # Уведомляем реферера о новой регистрации
+                if notification_service:
+                    try:
+                        await notification_service.add(
+                            user_id=referred_by_telegram_id,
+                            text=(
+                                f"👥 Пользователь @{user.username or 'новый пользователь'} "
+                                f"зарегистрировался по вашей реферальной ссылке!\n\n"
+                                f"Вы получите 2€ после того, как он сделает первый заказ. 🎉"
+                            )
                         )
-                    )
-                except Exception as e:
-                    print(f"Failed to send referral notification: {e}")
+                    except Exception as e:
+                        print(f"Failed to send referral notification: {e}")
+                else:
+                    print(f"⚠️ notification_service не инициализирован для реферера")
     else:
         # Обновляем подписку существующего пользователя
         await db.execute("""

@@ -471,7 +471,6 @@ async def admin_commands(message: types.Message, db):
     
     args = message.text.split()
     if len(args) > 1 and args[1].lower() == "full":
-        # Полный список команд - УБИРАЕМ MARKDOWN
         commands_text = (
             "🛠️ Полный список команд администратора:\n\n"
             "ПРОМОКОДЫ:\n"
@@ -483,42 +482,39 @@ async def admin_commands(message: types.Message, db):
             "/deletepromotion PROMOTION_ID - Удалить промо-акцию\n\n"
             "УВЕДОМЛЕНИЯ:\n"
             "/notify <telegram_id> \"Текст\" - Отправить уведомление пользователю\n"
-            "/broadcast \"Текст\"  - Создать глобальную рассылку\n\n"
-            "/notifybutton <telegram_id> \"Текст | КнопкаТекст | url:ссылка/ callback:действие\" -  Отправить уведомление с кнопкой\n"
-            "/broadcastbutton \"Текст | КнопкаТекст | url:ссылка/ callback:действие\" - Создать глобальную рассылку с кнопкой\n\n"
-            "КОМАНДЫ ДЛЯ ОСТАТКОВ:\n"
+            "/broadcast \"Текст\" - Создать глобальную рассылку\n"
+            "/notifybutton <telegram_id> \"Текст | КнопкаТекст | url:ссылка/callback:действие\" - Отправить с кнопкой\n"
+            "/broadcastbutton \"Текст | КнопкаТекст | url:ссылка/callback:действие\" - Рассылка с кнопкой\n\n"
+            "ЗАКАЗЫ:\n"
+            "/accept <order_id> - Принять заказ\n"
+            "/decline <order_id> - Отклонить заказ\n"
+            "/deliver <order_id> <мин> - Отметить как отправленный\n"
+            "/confirm <order_id> - Подтвердить оплату и завершить\n"
+            "/orders - Показать неподтвержденные заказы\n"
+            "/pending_orders - Показать все активные заказы\n"
+            "/look_order <id> - Показать конкретный заказ\n\n"
+            "ТОВАРЫ:\n"
             "/stock - Просмотр продуктов\n"
-            "/stock set <product_id> <qty> - Установить остаток вкуса\n"
-            "/stock add <brand_id> <product_name> <price> <qty> - Добавить новый продукт\n"
-            "/stock help - Помощь по командам управления остатками\n\n"
-            "ДРУГИЕ КОМАНДЫ:\n"
-            "/users - Показать список пользователей\n"
-            "/orders - Показать список заказов пользователю\n"
-            "/pending_orders - Показать список всех заказов\n"
-            "/look_order <id> - Показать конкретный заказ\n"
-            "/cancel_order <id> - Отказ для пользователя(добавить им в меню)\n"
-            "/stats - Статистика(для админов)\n"
-
-
+            "/stock set <product_id> <qty> - Установить остаток\n"
+            "/stock add <brand_id> <name> <price> <qty> - Добавить товар\n\n"
+            "СТАТИСТИКА:\n"
+            "/stats - Общая статистика бота\n"
+            "/refstats - Статистика реферальной программы\n\n"
+            "/users - Список пользователей"
         )
         await message.answer(commands_text)
     else:
-        # Краткий список команд - УБИРАЕМ MARKDOWN
         commands_text = (
-            "🛠️ Краткий список команд администратора:\n\n"
+            "🛠️ Краткий список команд:\n\n"
             "/createpromo - Создать промокод\n"
-            "/deletepromo - Удалить промокод\n"
-            "/activepromos - Показать активные промокоды\n"
-            "/disablepromo - Деактивировать промокод\n"
-            "/createpromotion - Создать промо-акцию\n"
-            "/deletepromotion - Удалить промо-акцию\n"
-            "/notify - Отправить уведомление пользователю\n"
-            "/broadcast - Создать глобальную рассылку\n"
-            "/notifybutton - Отправить уведомление с кнопкой\n"
-            "/broadcastbutton - Создать глобальную рассылку с кнопкой\n"
-            "/stock - Управление остатками продуктов\n"
-            "/users - Показать пользователей\n"
-            "/orders - Показать заказы\n\n"
+            "/activepromos - Активные промокоды\n"
+            "/notify - Отправить уведомление\n"
+            "/broadcast - Глобальная рассылка\n"
+            "/accept - Принять заказ\n"
+            "/orders - Неподтвержденные заказы\n"
+            "/stock - Управление товарами\n"
+            "/stats - Общая статистика\n"
+            "/refstats - Статистика рефералки\n\n"
             "Используйте /admincommands full для полного списка."
         )
         await message.answer(commands_text)
@@ -763,3 +759,90 @@ async def orders_command(message: types.Message, db):
     
     await message.answer(text, parse_mode="Markdown")
 
+
+@router.message(Command("refstats"))
+async def referral_statistics(message: types.Message, db):
+    """Статистика по реферальной программе для админов"""
+    if not await is_admin(db, message.from_user.id):
+        return await message.answer("❌ У вас нет прав для просмотра.")
+    
+    # Общая сумма "напечатанных денег" (начисленных бонусов)
+    total_bonuses_issued = await db.fetchval("""
+        SELECT COALESCE(SUM(
+            CASE 
+                WHEN order_id IS NOT NULL THEN discount_amount 
+                ELSE 0 
+            END
+        ), 0)
+        FROM referral_discounts
+    """) or 0.0
+    
+    # Сумма использованных бонусов (списанных)
+    total_bonuses_used = await db.fetchval("""
+        SELECT COALESCE(SUM(discount_amount), 0)
+        FROM orders
+        WHERE promo_code_used = 'referral' AND status IN ('completed', 'delivery', 'accepted')
+    """) or 0.0
+    
+    # Активные бонусы (доступные для использования)
+    total_bonuses_active = await db.fetchval("""
+        SELECT COALESCE(SUM(discount_amount), 0)
+        FROM referral_discounts
+        WHERE discount_amount > 0
+    """) or 0.0
+    
+    # Топ рефереров
+    top_referrers = await db.fetch("""
+        SELECT 
+            u.username,
+            u.telegram_id,
+            COUNT(DISTINCT ref.telegram_id) as referrals_count,
+            COALESCE(SUM(rd.discount_amount), 0) as total_earned
+        FROM users u
+        LEFT JOIN users ref ON ref.referred_by = u.telegram_id
+        LEFT JOIN referral_discounts rd ON rd.referrer_telegram_id = u.telegram_id
+        WHERE ref.telegram_id IS NOT NULL
+        GROUP BY u.user_id
+        ORDER BY total_earned DESC
+        LIMIT 10
+    """)
+    
+    # Статистика по уровням
+    level1_bonuses = await db.fetchval("""
+        SELECT COALESCE(SUM(discount_amount), 0)
+        FROM referral_discounts
+        WHERE discount_amount = 2.00
+    """) or 0.0
+    
+    level2_bonuses = await db.fetchval("""
+        SELECT COALESCE(SUM(discount_amount), 0)
+        FROM referral_discounts
+        WHERE discount_amount = 0.50
+    """) or 0.0
+    
+    # Формируем ответ
+    text = "💰 СТАТИСТИКА РЕФЕРАЛЬНОЙ ПРОГРАММЫ\n"
+    text += "━━━━━━━━━━━━━━━━━━━━\n\n"
+    
+    text += "📊 Общая информация:\n"
+    text += f"   💵 Всего начислено: {total_bonuses_issued:.2f}€\n"
+    text += f"   ✅ Использовано: {total_bonuses_used:.2f}€\n"
+    text += f"   💰 Активных бонусов: {total_bonuses_active:.2f}€\n"
+    text += f"   🔥 Долг (к выплате): {total_bonuses_active:.2f}€\n\n"
+    
+    text += "📈 По уровням:\n"
+    text += f"   1 уровень (2€): {level1_bonuses:.2f}€\n"
+    text += f"   2 уровень (0.5€): {level2_bonuses:.2f}€\n\n"
+    
+    if top_referrers:
+        text += "🏆 Топ рефереров:\n"
+        for i, ref in enumerate(top_referrers[:10], 1):
+            username = ref['username'] or f"ID{ref['telegram_id']}"
+            text += f"   {i}. @{username}\n"
+            text += f"      👥 Рефералов: {ref['referrals_count']}\n"
+            text += f"      💰 Заработано: {ref['total_earned']:.2f}€\n"
+    
+    text += "\n━━━━━━━━━━━━━━━━━━━━\n"
+    text += "ℹ️ Используйте /stats для общей статистики"
+    
+    await message.answer(text)

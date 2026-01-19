@@ -978,27 +978,27 @@ async def confirm_order(event, state: FSMContext):
     total_items = sum(item['quantity'] for item in data['items'].values())
     delivery_cost = 0 if total_items >= 4 else 1.0
     
-    # ИСПРАВЛЕНИЕ: Сначала рассчитываем final_amount
+    # ИСПРАВЛЕНИЕ: final_amount УЖЕ включает все (товары - скидка)
+    # Доставка добавляется ТОЛЬКО для отображения
     base_final_amount = data.get('final_amount', data['total_amount'])
-    final_amount = base_final_amount + delivery_cost
+    total_with_delivery = base_final_amount + delivery_cost
     
     # Формируем текст заказа
     order_text = "✅ *Подтверждение заказа*\n\n"
     order_text += await format_order_text(
-        items=data['items'], 
-        discount_amount=data.get('discount_amount', 0), 
-        final_amount=final_amount, 
-        promo_code=data.get('promo_code'),
-        delivery_cost=delivery_cost
+        data['items'], 
+        data.get('discount_amount', 0), 
+        total_with_delivery,  # Показываем с доставкой
+        data.get('promo_code'),
+        delivery_cost
     )
     
     # Информация о доставке
     order_text += f"\n📍 *Адрес доставки:*\n{data.get('address_text', 'Не указан')}\n"
     
-    # Контактная информация (экранируем специальные символы для Markdown)
+    # Контактная информация
     order_text += "\n📞 *Контактная информация:*\n"
     if data.get('username'):
-        # Экранируем _ для Markdown
         username = data['username'].replace('_', '\\_')
         order_text += f"Telegram: @{username}\n"
     if data.get('phone'):
@@ -1015,46 +1015,40 @@ async def confirm_order(event, state: FSMContext):
         [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_order")]
     ])
     
-    # ИСПРАВЛЕНИЕ: правильная обработка типа события
     if isinstance(event, types.CallbackQuery):
-        # Если это callback query, используем message из него
         try:
             await event.message.edit_text(
                 order_text,
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
-        except Exception:
-            try:
-                await event.message.delete()
-            except:
-                pass
+        except:
+            await event.message.delete()
             await event.message.answer(
                 order_text,
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
     else:
-        # Если это обычное сообщение
         try:
             await event.edit_text(
                 order_text,
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
-        except Exception:
-            try:
-                await event.delete()
-            except:
-                pass
+        except:
+            await event.delete()
             await event.answer(
                 order_text,
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
     
-    # Сохраняем delivery_cost и final_amount в состоянии
-    await state.update_data(final_amount=final_amount, delivery_cost=delivery_cost)
+    # ИСПРАВЛЕНИЕ: Сохраняем правильную финальную сумму
+    await state.update_data(
+        final_amount_with_delivery=total_with_delivery,
+        delivery_cost=delivery_cost
+    )
     
     await state.set_state(OrderStates.confirm_order)
 
@@ -1089,15 +1083,14 @@ async def cancel_order_handler(callback: types.CallbackQuery, state: FSMContext)
 
 @router.callback_query(F.data == "confirm_order_final", OrderStates.confirm_order)
 async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
-    """Финальное подтверждение и создание заказа С ТРАНЗАКЦИЕЙ"""
+    """Финальное подтверждение и создание заказа"""
     data = await state.get_data()
     user_id = data['user_id']
     
     try:
-        # Начинаем транзакцию
         async with db.pool.acquire() as conn:
             async with conn.transaction():
-                # ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА #1: Количество единиц товара
+                # Проверки...
                 total_items = sum(item['quantity'] for item in data['items'].values())
                 if total_items > 10:
                     await callback.answer(
@@ -1107,25 +1100,24 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                     )
                     return
                 
-                # ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА #2: Количество активных заказов
-                rows = await db.fetch("""
+                active_orders = await conn.fetch("""
                     SELECT order_id
                     FROM orders
                     WHERE telegram_id = $1
                         AND status IN ('pending', 'accepted', 'delivery')
                     FOR UPDATE
                 """, user_id)
-                active_orders_count = len(rows)
-                
+
+                active_orders_count = len(active_orders or [])
                 if active_orders_count >= 2:
                     await callback.answer(
-                        f"❌ У вас уже есть {active_orders_count} активных заказа.\n"
+                        f"❌ У вас уже есть 2 активных заказа.\n"
                         f"Дождитесь завершения текущих заказов.",
                         show_alert=True
                     )
                     return
                 
-                # 1. Проверяем и блокируем товары (FOR UPDATE блокирует строки)
+                # Проверка товаров
                 for product_id_str, item in data['items'].items():
                     product_id = int(product_id_str)
                     
@@ -1138,16 +1130,16 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                     
                     if not product or product['stock_quantity'] < item['quantity']:
                         await callback.answer(
-                            f"❌ Товар '{product['product_name'] if product else 'Unknown'}' закончился или недостаточно на складе",
+                            f"❌ Товар '{product['product_name'] if product else 'Unknown'}' закончился",
                             show_alert=True
                         )
                         return
                 
-                # 2. Создаем заказ
-                total_items = sum(item['quantity'] for item in data['items'].values())
-                delivery_cost = 0 if total_items >= 4 else 1.0
-                final_amount = data.get('final_amount', data['total_amount']) + delivery_cost
+                # ИСПРАВЛЕНИЕ: Используем правильную финальную сумму
+                delivery_cost = data.get('delivery_cost', 0)
+                final_amount = data.get('final_amount_with_delivery', data['total_amount'])
                 
+                # Создаем заказ
                 order_id = await conn.fetchval("""
                     INSERT INTO orders (
                         telegram_id, total_amount, discount_amount, final_amount,
@@ -1158,22 +1150,20 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                 user_id, 
                 data['total_amount'], 
                 data.get('discount_amount', 0), 
-                final_amount,
+                final_amount,  # ИСПРАВЛЕНО: уже включает доставку
                 data.get('address_text', 'Не указан'),
                 data.get('promo_code'))
                 
-                # 3. Добавляем товары и списываем со склада
+                # Добавляем товары и списываем со склада
                 for product_id_str, item in data['items'].items():
                     product_id = int(product_id_str)
                     item_total = item['price'] * item['quantity']
                     
-                    # Добавляем в order_items
                     await conn.execute("""
                         INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price)
                         VALUES ($1, $2, $3, $4, $5)
                     """, order_id, product_id, item['quantity'], item['price'], item_total)
                     
-                    # Списываем со склада и увеличиваем счетчик
                     await conn.execute("""
                         UPDATE products 
                         SET stock_quantity = stock_quantity - $1,
@@ -1181,7 +1171,7 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                         WHERE product_id = $2
                     """, item['quantity'], product_id)
                 
-                # 4. Обрабатываем промокод
+                # Обрабатываем промокод
                 if data.get('promo_code') and data['promo_code'] != 'none' and data['promo_code'] != 'referral':
                     promo = data.get('promo_data')
                     if promo and promo.get('promo_id'):
@@ -1191,12 +1181,11 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                             WHERE telegram_id = $1 AND promo_id = $2
                         """, user_id, promo['promo_id'])
                 
-                # 5. ИСПРАВЛЕНИЕ #2: Правильное списание реферальных бонусов
+                # Списание реферальных бонусов
                 if data.get('promo_code') == 'referral' and data.get('discount_amount', 0) > 0:
                     used_amount = data['discount_amount']
                     remaining = used_amount
                     
-                    # Получаем бонусы с блокировкой FOR UPDATE
                     bonuses = await conn.fetch("""
                         SELECT referral_discount_id, discount_amount 
                         FROM referral_discounts 
@@ -1205,13 +1194,12 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                         FOR UPDATE
                     """, user_id)
                     
-                    # Списываем поэтапно
                     for bonus in bonuses:
                         if remaining <= 0:
                             break
                         
                         deduct = min(remaining, bonus['discount_amount'])
-                        new_amount = bonus['discount_amount'] - Decimal(deduct)
+                        new_amount = bonus['discount_amount'] - deduct
                         
                         await conn.execute("""
                             UPDATE referral_discounts 
@@ -1223,10 +1211,10 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                     
                     print(f"✅ Списано {used_amount - remaining}€ реферальных бонусов")
                 
-                # 6. Очищаем корзину
+                # Очищаем корзину
                 await conn.execute("DELETE FROM cart WHERE telegram_id = $1", user_id)
                 
-                # 7. Обновляем статистику пользователя
+                # Обновляем статистику
                 await conn.execute("""
                     UPDATE users 
                     SET total_orders = total_orders + 1,
@@ -1235,9 +1223,7 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                     WHERE telegram_id = $2
                 """, final_amount, user_id)
                 
-                print(f"✅ Заказ #{order_id} успешно создан в транзакции")
-        
-        # Транзакция завершена успешно - отправляем уведомления
+                print(f"✅ Заказ #{order_id} создан: {final_amount:.2f}€")
         
         # Очищаем состояние
         await state.clear()
@@ -1245,7 +1231,7 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
         # Уведомляем пользователя
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🏠 В главное меню", callback_data="main_menu")],
-            [InlineKeyboardButton(text="📋 Мои заказы", callback_data="active_orders")]
+            [InlineKeyboardButton(text="📋 Мои заказы", callback_data="my_orders")]
         ])
         
         await callback.message.edit_text(
@@ -1258,7 +1244,7 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
         )
         
         await callback.answer()
-        await notify_admins_about_order(order_id, data)
+        await notify_admins_about_order(order_id, data, final_amount, delivery_cost)
         
     except Exception as e:
         print(f"🔥 Ошибка при создании заказа: {e}")
@@ -1266,23 +1252,22 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
         traceback.print_exc()
         
         await callback.answer(
-            "❌ Ошибка при оформлении заказа. Попробуйте позже или обратитесь в поддержку.",
+            "❌ Ошибка при оформлении заказа. Попробуйте позже.",
             show_alert=True
         )
 
-async def notify_admins_about_order(order_id: int, order_data: dict):
-    """Отправка уведомлений админам через очередь (БЫСТРО)"""
+
+async def notify_admins_about_order(order_id: int, order_data: dict, final_amount: float, delivery_cost: float):
+    """Отправка уведомлений админам"""
     from bot_instance import notification_service
     
     try:
-        # Получаем всех админов
         admins = await db.fetch("SELECT telegram_id FROM users WHERE role = 'admin'")
         
         if not admins:
             print("⚠️ Нет администраторов")
             return
         
-        # Формируем текст ОДИН раз
         username = order_data.get('username', 'без username')
         phone = order_data.get('phone', 'не указан')
         address = order_data.get('address_text', 'не указан')
@@ -1299,10 +1284,12 @@ async def notify_admins_about_order(order_id: int, order_data: dict):
             item_total = item['price'] * item['quantity']
             notification_text += f"• {item['name']}: {item['quantity']}шт × {item['price']:.2f}€ = {item_total:.2f}€\n"
         
+        # ИСПРАВЛЕНИЕ: Правильный расчет
         notification_text += (
-            f"\n💰 Сумма: {order_data['total_amount']:.2f}€\n"
-            f"🎁 Скидка: {order_data.get('discount_amount', 0):.2f}€\n"
-            f"💳 Итого: {order_data.get('final_amount', order_data['total_amount']):.2f}€\n\n"
+            f"\n💰 Сумма товаров: {order_data['total_amount']:.2f}€\n"
+            f"🎁 Скидка: -{order_data.get('discount_amount', 0):.2f}€\n"
+            f"🚚 Доставка: +{delivery_cost:.2f}€\n"
+            f"💳 ИТОГО: {final_amount:.2f}€\n\n"
             f"Команды:\n"
             f"/accept {order_id}\n"
             f"/decline {order_id}\n"
@@ -1310,7 +1297,55 @@ async def notify_admins_about_order(order_id: int, order_data: dict):
             f"/confirm {order_id}"
         )
         
-        # Добавляем ВСЕ уведомления в очередь СРАЗУ (не блокирует!)
+        notifications = [
+            (admin['telegram_id'], notification_text, {})
+            for admin in admins
+        ]
+        await notification_service.add_bulk_to_queue(notifications)
+        
+        print(f"✅ {len(admins)} уведомлений добавлено в очередь")
+        
+    except Exception as e:
+        print(f"🔥 Ошибка notify_admins_about_order: {e}")
+    """Отправка уведомлений админам"""
+    from bot_instance import notification_service
+    
+    try:
+        admins = await db.fetch("SELECT telegram_id FROM users WHERE role = 'admin'")
+        
+        if not admins:
+            print("⚠️ Нет администраторов")
+            return
+        
+        username = order_data.get('username', 'без username')
+        phone = order_data.get('phone', 'не указан')
+        address = order_data.get('address_text', 'не указан')
+        
+        notification_text = (
+            f"🆕 НОВЫЙ ЗАКАЗ #{order_id}\n\n"
+            f"👤 @{username}\n"
+            f"📞 {phone}\n"
+            f"📍 {address}\n\n"
+            f"🛒 Состав:\n"
+        )
+        
+        for item in order_data['items'].values():
+            item_total = item['price'] * item['quantity']
+            notification_text += f"• {item['name']}: {item['quantity']}шт × {item['price']:.2f}€ = {item_total:.2f}€\n"
+        
+        # ИСПРАВЛЕНИЕ: Правильный расчет
+        notification_text += (
+            f"\n💰 Сумма товаров: {order_data['total_amount']:.2f}€\n"
+            f"🎁 Скидка: -{order_data.get('discount_amount', 0):.2f}€\n"
+            f"🚚 Доставка: +{delivery_cost:.2f}€\n"
+            f"💳 ИТОГО: {final_amount:.2f}€\n\n"
+            f"Команды:\n"
+            f"/accept {order_id}\n"
+            f"/decline {order_id}\n"
+            f"/deliver {order_id} <мин>\n"
+            f"/confirm {order_id}"
+        )
+        
         notifications = [
             (admin['telegram_id'], notification_text, {})
             for admin in admins
