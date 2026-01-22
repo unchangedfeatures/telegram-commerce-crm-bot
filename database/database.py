@@ -1,35 +1,62 @@
 import asyncpg
 import json
+import os
 from datetime import datetime
 from cache_helpers import cached
 
 pool: asyncpg.Pool | None = None
+_db_initialized = False
+
+# Get database credentials from environment variables once
+DB_USER = os.getenv("DB_USER", "parxpress_user")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
+DB_NAME = os.getenv("DB_NAME", "parxpress_db")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
 
 
 async def init_db():
-    global pool
-    if pool is None:
+    global pool, _db_initialized
+    if pool is not None and _db_initialized:
+        return pool
+    
+    try:
         pool = await asyncpg.create_pool(
-            user="postgres",
-            password="pewpuff_admin",
-            database="pewpuff",
-            host="localhost",
-            port=5432,
-            min_size=2, 
-            max_size=20,  
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT,
+            min_size=1, 
+            max_size=10,  
             command_timeout=60,  
             max_queries=50000,  
             max_cached_statement_lifetime=300,  
             max_cacheable_statement_size=1024 * 15,  
             max_inactive_connection_lifetime=300
         )
+        _db_initialized = True
+        print(f"✅ Database connected: {DB_USER}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
+        return pool
+    except Exception as e:
+        print(f"❌ Database connection failed: {e}")
+        import traceback
+        traceback.print_exc()
+        _db_initialized = False
+        pool = None
+        raise
 
 async def close_db():
     """Закрыть все подключения к базе данных"""
-    global pool
+    global pool, _db_initialized
     if pool:
-        await pool.close()
-        pool = None
+        try:
+            await pool.close()
+        except Exception as e:
+            print(f"Error closing pool: {e}")
+        finally:
+            pool = None
+            _db_initialized = False
 
 async def get_products_cached(brand_id: int = None, use_cache: bool = True):
     """Получить товары с кэшированием"""
@@ -167,19 +194,27 @@ async def bulk_update_stock(updates: list):
 # ----------------------
 
 async def fetch(query: str, *args):
+    if pool is None:
+        raise RuntimeError("Database pool not initialized. Call init_db() first.")
     async with pool.acquire() as conn:
         return await conn.fetch(query, *args)
 
 async def fetchrow(query: str, *args):
+    if pool is None:
+        raise RuntimeError("Database pool not initialized. Call init_db() first.")
     async with pool.acquire() as conn:
         row = await conn.fetchrow(query, *args)
         return dict(row) if row else None
 
 async def fetchval(query: str, *args):
+    if pool is None:
+        raise RuntimeError("Database pool not initialized. Call init_db() first.")
     async with pool.acquire() as conn:
         return await conn.fetchval(query, *args)
 
 async def execute(query: str, *args):
+    if pool is None:
+        raise RuntimeError("Database pool not initialized. Call init_db() first.")
     async with pool.acquire() as conn:
         return await conn.execute(query, *args)
 
@@ -743,3 +778,81 @@ async def get_order_full_optimized(order_id: int):
         WHERE o.order_id = $1
         GROUP BY o.order_id, u.user_id
     """, order_id)
+
+# ============================================================================
+# DELIVERY SETTINGS
+# ============================================================================
+
+async def get_delivery_settings():
+    """???????? ????????? ????????"""
+    settings = await fetchrow("""
+        SELECT * FROM delivery_settings 
+        WHERE is_active = TRUE
+        LIMIT 1
+    """)
+    if not settings:
+        # ?????????? ???????? ?? ?????????
+        return {
+            'free_delivery_threshold': 3.0,
+            'standard_delivery_cost': 1.0,
+            'high_demand_delivery_cost': 2.0,
+            'high_demand_orders_threshold': 7,
+            'pickup_location_name': 'AKROPOLIS',
+            'enable_pickup': True,
+            'pickup_free': True
+        }
+    return dict(settings)
+
+async def update_delivery_settings(**kwargs):
+    """???????? ????????? ????????"""
+    allowed_fields = [
+        'free_delivery_threshold',
+        'standard_delivery_cost',
+        'high_demand_delivery_cost',
+        'high_demand_orders_threshold',
+        'pickup_location_name',
+        'enable_pickup',
+        'pickup_free'
+    ]
+    
+    updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+    if not updates:
+        return None
+    
+    set_clause = ', '.join([f"{k} = $" + (i+1).ToString() for i, k in enumerate(updates.keys())])
+    set_clause += ", updated_at = NOW()"
+    
+    query = f"UPDATE delivery_settings SET {set_clause} WHERE is_active = TRUE RETURNING *"
+    return await fetchrow(query, *updates.values())
+
+async def count_orders_today():
+    """?????????? ?????????? ???????? ??????? ???????"""
+    count = await fetchval("""
+        SELECT COUNT(*) FROM orders
+        WHERE status IN ('accepted', 'delivery', 'delivered')
+        AND DATE(created_at) = CURRENT_DATE
+    """)
+    return count or 0
+
+async def calculate_delivery_cost(total_amount: float, delivery_type: str = 'delivery') -> tuple:
+    """?????????? ????????? ????????"""
+    settings = await get_delivery_settings()
+    
+    if delivery_type == 'pickup':
+        return (0.0, None)
+    
+    free_threshold = float(settings['free_delivery_threshold'])
+    if total_amount >= free_threshold:
+        return (0.0, None)
+    
+    orders_today = await count_orders_today()
+    high_demand_threshold = settings['high_demand_orders_threshold']
+    high_demand_note = None
+    
+    if orders_today >= high_demand_threshold:
+        delivery_cost = float(settings['high_demand_delivery_cost'])
+        high_demand_note = " ??????? ?????!"
+    else:
+        delivery_cost = float(settings['standard_delivery_cost'])
+    
+    return (delivery_cost, high_demand_note)

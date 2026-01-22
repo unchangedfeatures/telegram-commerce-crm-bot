@@ -1,0 +1,21 @@
+[Unit]
+Description=ParXpress Admin Web Panel
+After=network.target postgresql.service
+StartLimitBurst=5
+StartLimitIntervalSec=600
+
+[Service]
+Type=simple
+User=parxpress
+WorkingDirectory=/opt/parxpress
+Environment="PATH=/opt/parxpress/venv/bin"
+EnvironmentFile=/opt/parxpress/.env
+ExecStart=/opt/parxpress/venv/bin/gunicorn -w 4 -b 0.0.0.0:5000 admin_app:app
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=parxpress-web
+
+[Install]
+WantedBy=multi-user.target

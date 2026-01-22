@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}История выплат - PewPuff Admin{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{{ url_for('referrals') }}" class="text-decoration-none">
+        <i class="bi bi-arrow-left"></i> Назад к рефералам
+    </a>
+    <h2 class="mt-2"><i class="bi bi-clock-history"></i> История выплат и обнулений</h2>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="text-muted small">Всего выплачено</div>
+            <h3 class="mb-0 text-success">{{ "%.2f"|format(stats.total_paid or 0) }}€</h3>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="text-muted small">Всего обнулено</div>
+            <h3 class="mb-0 text-danger">{{ "%.2f"|format(stats.total_reset or 0) }}€</h3>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="text-muted small">Операций за месяц</div>
+            <h3 class="mb-0">{{ stats.this_month_count or 0 }}</h3>
+        </div>
+    </div>
+</div>
+
+<div class="table-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>Журнал операций</h5>
+        <div class="btn-group btn-group-sm">
+            <a href="{{ url_for('referral_payments_history', type='all') }}" 
+               class="btn {% if type_filter == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                Все
+            </a>
+            <a href="{{ url_for('referral_payments_history', type='paid') }}" 
+               class="btn {% if type_filter == 'paid' %}btn-success{% else %}btn-outline-success{% endif %}">
+                Выплаты
+            </a>
+            <a href="{{ url_for('referral_payments_history', type='reset') }}" 
+               class="btn {% if type_filter == 'reset' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+                Обнуления
+            </a>
+        </div>
+    </div>
+    
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Пользователь</th>
+                <th>Сумма</th>
+                <th>Тип</th>
+                <th>Причина/Примечание</th>
+                <th>Администратор</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in payments %}
+            <tr>
+                <td>{{ log.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td>
+                    <a href="{{ url_for('user_detail', telegram_id=log.telegram_id) }}">
+                        {% if log.username %}
+                            @{{ log.username }}
+                        {% else %}
+                            ID: {{ log.telegram_id }}
+                        {% endif %}
+                    </a>
+                </td>
+                <td>
+                    {% if log.payment_type == 'paid' %}
+                        <span class="text-success">+{{ "%.2f"|format(log.amount) }}€</span>
+                    {% else %}
+                        <span class="text-danger">-{{ "%.2f"|format(log.amount) }}€</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if log.payment_type == 'paid' %}
+                        <span class="badge bg-success">Выплачено</span>
+                    {% else %}
+                        <span class="badge bg-danger">Обнулено</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if log.reason %}
+                        {{ log.reason }}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>{{ log.created_by or 'admin' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <!-- Пагинация -->
+    {% if total_pages > 1 %}
+    <nav>
+        <ul class="pagination justify-content-center">
+            {% for p in range(1, total_pages + 1) %}
+            <li class="page-item {% if p == page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('referral_payments_history', type=type_filter, page=p) }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

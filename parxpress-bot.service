@@ -1,0 +1,21 @@
+[Unit]
+Description=ParXpress Telegram Bot
+After=network.target postgresql.service
+StartLimitBurst=5
+StartLimitIntervalSec=600
+
+[Service]
+Type=simple
+User=parxpress
+WorkingDirectory=/opt/parxpress
+Environment="PATH=/opt/parxpress/venv/bin"
+EnvironmentFile=/opt/parxpress/.env
+ExecStart=/opt/parxpress/venv/bin/python /opt/parxpress/bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=parxpress-bot
+
+[Install]
+WantedBy=multi-user.target

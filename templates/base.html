@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}Админ-панель PewPuff{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
@@ -10,12 +10,26 @@
         :root {
             --sidebar-width: 250px;
             --primary-color: #6366f1;
+            --mobile-sidebar-width: 100%;
+        }
+        
+        * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        input, textarea, select, button {
+            -webkit-user-select: text;
+            user-select: text;
         }
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            padding-top: 0;
         }
         
+        /* Мобильное меню */
         .sidebar {
             position: fixed;
             top: 0;
@@ -26,6 +40,26 @@
             color: white;
             padding: 20px;
             overflow-y: auto;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar.mobile-hidden {
+            transform: translateX(-100%);
+        }
+        
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1001;
+            background: var(--primary-color);
+            border: none;
+            color: white;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
         }
         
         .sidebar .logo {
@@ -41,12 +75,16 @@
             border-radius: 8px;
             margin-bottom: 5px;
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .sidebar .nav-link:hover,
         .sidebar .nav-link.active {
             background: rgba(255, 255, 255, 0.2);
             color: white;
+            text-decoration: none;
         }
         
         .main-content {
@@ -93,37 +131,165 @@
         .btn-primary:hover {
             background: #4f46e5;
         }
+        
+        /* МОБИЛЬНАЯ АДАПТИВНОСТЬ */
+        @media (max-width: 768px) {
+            :root {
+                --sidebar-width: 0;
+                --mobile-sidebar-width: 100%;
+            }
+            
+            .mobile-toggle {
+                display: block;
+            }
+            
+            .sidebar {
+                width: 100%;
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                margin-left: 0;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar.mobile-show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+                padding: 15px;
+                padding-top: 60px;
+            }
+            
+            .stat-card {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+            
+            .stat-card h3 {
+                font-size: 18px;
+            }
+            
+            .table-container {
+                padding: 15px;
+                overflow-x: auto;
+            }
+            
+            table {
+                font-size: 13px;
+            }
+            
+            .btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            
+            .navbar {
+                padding: 0.5rem 1rem;
+            }
+            
+            .form-control, .form-select {
+                font-size: 16px;
+            }
+            
+            .btn-group {
+                flex-wrap: wrap;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .main-content {
+                padding: 10px;
+                padding-top: 50px;
+            }
+            
+            .table-container {
+                padding: 10px;
+            }
+            
+            h1, h2 {
+                font-size: 20px;
+            }
+            
+            h5 {
+                font-size: 14px;
+            }
+            
+            .stat-card {
+                padding: 12px;
+            }
+            
+            .row {
+                margin: -5px;
+            }
+            
+            .col-md-3 {
+                padding: 5px;
+            }
+        }
+        
+        /* Оптимизация для сенсорного ввода */
+        button, a.btn, .nav-link {
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Улучшение для мобильных клавиатур */
+        input:focus, textarea:focus, select:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <div class="sidebar">
+    <!-- Мобильное меню бургер -->
+    <button class="mobile-toggle" id="mobileToggle">
+        <i class="bi bi-list"></i>
+    </button>
+    
+    <div class="sidebar" id="sidebar">
         <div class="logo">
             <i class="bi bi-fire"></i> PewPuff
         </div>
         
         <nav class="nav flex-column">
             <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
-                <i class="bi bi-speedometer2"></i> Дашборд
+                <i class="bi bi-speedometer2"></i>
+                <span>Дашборд</span>
             </a>
             <a class="nav-link {% if request.endpoint in ['orders', 'order_detail'] %}active{% endif %}" href="{{ url_for('orders') }}">
-                <i class="bi bi-bag"></i> Заказы
+                <i class="bi bi-bag"></i>
+                <span>Заказы</span>
             </a>
             <a class="nav-link {% if request.endpoint in ['users', 'user_detail'] %}active{% endif %}" href="{{ url_for('users') }}">
-                <i class="bi bi-people"></i> Пользователи
+                <i class="bi bi-people"></i>
+                <span>Пользователи</span>
             </a>
             <a class="nav-link {% if request.endpoint == 'products' %}active{% endif %}" href="{{ url_for('products') }}">
-                <i class="bi bi-box"></i> Товары
+                <i class="bi bi-box"></i>
+                <span>Товары</span>
             </a>
             <a class="nav-link {% if request.endpoint == 'promocodes' %}active{% endif %}" href="{{ url_for('promocodes') }}">
-                <i class="bi bi-ticket-perforated"></i> Промокоды
+                <i class="bi bi-ticket-perforated"></i>
+                <span>Промокоды</span>
             </a>
             <a class="nav-link {% if request.endpoint == 'notifications' %}active{% endif %}" href="{{ url_for('notifications') }}">
-                <i class="bi bi-bell"></i> Уведомления
+                <i class="bi bi-bell"></i>
+                <span>Уведомления</span>
+            </a>
+            <a class="nav-link {% if request.endpoint == 'referrals' %}active{% endif %}" href="{{ url_for('referrals') }}">
+                <i class="bi bi-people-fill"></i>
+                <span>Реферралы</span>
             </a>
             <hr style="border-color: rgba(255,255,255,0.2)">
             <a class="nav-link" href="{{ url_for('logout') }}">
-                <i class="bi bi-box-arrow-right"></i> Выход
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Выход</span>
             </a>
         </nav>
     </div>
@@ -145,6 +311,34 @@
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Мобильное меню скрипт -->
+    <script>
+        const mobileToggle = document.getElementById('mobileToggle');
+        const sidebar = document.getElementById('sidebar');
+        
+        if (mobileToggle) {
+            mobileToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('mobile-show');
+            });
+            
+            // Закрытие меню при клике на ссылку
+            const navLinks = sidebar.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    sidebar.classList.remove('mobile-show');
+                });
+            });
+            
+            // Закрытие меню при клике вне его
+            document.addEventListener('click', function(event) {
+                if (!sidebar.contains(event.target) && !mobileToggle.contains(event.target)) {
+                    sidebar.classList.remove('mobile-show');
+                }
+            });
+        }
+    </script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>

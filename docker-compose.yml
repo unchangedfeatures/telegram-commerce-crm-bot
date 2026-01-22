@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: parxpress_db
+    environment:
+      POSTGRES_USER: ${DB_USER:-parxpress_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-strong_password}
+      POSTGRES_DB: ${DB_NAME:-parxpress_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-parxpress_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - parxpress_network
+
+  app:
+    build: .
+    container_name: parxpress_app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TOKEN: ${TOKEN}
+      ADMIN_ID: ${ADMIN_ID}
+      CHAT_ID: ${CHAT_ID}
+      USERNAME: ${USERNAME}
+      SUPPORT: ${SUPPORT}
+      ORDERS_CHAT_ID: ${ORDERS_CHAT_ID}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-parxpress_user}
+      DB_PASSWORD: ${DB_PASSWORD:-strong_password}
+      DB_NAME: ${DB_NAME:-parxpress_db}
+      FLASK_ENV: production
+    ports:
+      - "8080:8080"
+      - "5000:5000"
+    volumes:
+      - ./static/uploads:/app/static/uploads
+    networks:
+      - parxpress_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  parxpress_network:
+    driver: bridge

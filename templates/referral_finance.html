@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Финансовая информация по реферралам - PewPuff Admin{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2><i class="bi bi-cash-coin"></i> Финансовая информация по реферралам</h2>
+</div>
+
+<!-- Статистика -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="text-muted small">Всего начислено</div>
+            <h3 class="mb-0 text-success">{{ "%.2f"|format(stats.total_earned or 0) }}€</h3>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="text-muted small">Выплачено</div>
+            <h3 class="mb-0 text-info">{{ "%.2f"|format(stats.total_paid or 0) }}€</h3>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="text-muted small">К выплате</div>
+            <h3 class="mb-0 text-warning">{{ "%.2f"|format(stats.pending_payment or 0) }}€</h3>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="text-muted small">Активных рефереров</div>
+            <h3 class="mb-0">{{ stats.active_referrers or 0 }}</h3>
+        </div>
+    </div>
+</div>
+
+<!-- Активные бонусы -->
+<div class="table-container mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>Активные бонусы (к выплате)</h5>
+    </div>
+    
+    {% if active_bonuses %}
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Рефереp</th>
+                <th>Сумма к выплате</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bonus in active_bonuses %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('user_detail', telegram_id=bonus.referrer_telegram_id) }}">
+                        ID: {{ bonus.referrer_telegram_id }}
+                    </a>
+                </td>
+                <td>
+                    <span class="badge bg-warning">{{ "%.2f"|format(bonus.total_bonus) }}€</span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-success" onclick="markAsPaid({{ bonus.referrer_telegram_id }}, {{ bonus.total_bonus }})">
+                        <i class="bi bi-check-circle"></i> Выплатить
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Нет активных бонусов к выплате
+    </div>
+    {% endif %}
+</div>
+
+<!-- История выплат -->
+<div class="table-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>История выплат</h5>
+    </div>
+    
+    {% if payments %}
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Рефереp</th>
+                <th>Сумма</th>
+                <th>Дата выплаты</th>
+                <th>Примечание</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for payment in payments %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('user_detail', telegram_id=payment.referrer_telegram_id) }}">
+                        {% if payment.username %}
+                            @{{ payment.username }}
+                        {% else %}
+                            ID: {{ payment.referrer_telegram_id }}
+                        {% endif %}
+                    </a>
+                </td>
+                <td>{{ "%.2f"|format(payment.amount) }}€</td>
+                <td>
+                    {% if payment.paid_at %}
+                        {{ payment.paid_at.strftime('%d.%m.%Y %H:%M') }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ payment.notes or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> История выплат пуста
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function markAsPaid(telegramId, amount) {
+    if (confirm(`Отметить выплату ${amount.toFixed(2)}€ рефереру ${telegramId}?`)) {
+        fetch('/referrals/mark-paid', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                telegram_id: telegramId,
+                amount: amount
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Выплата отмечена как произведённая');
+                location.reload();
+            } else {
+                alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+            }
+        })
+        .catch(error => alert('Ошибка сети: ' + error));
+    }
+}
+</script>
+
+{% endblock %}
