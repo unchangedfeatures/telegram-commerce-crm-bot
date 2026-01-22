@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Параметры Доставки - PewPuff Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-truck"></i> Параметры Доставки</h2>
+    </div>
+
+    <!-- Alerts -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'warning' if category == 'warning' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Settings Card -->
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-gear"></i> Основные настройки доставки</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('update_delivery_settings') }}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="free_delivery_threshold" class="form-label">
+                                <i class="bi bi-box-seam"></i> Количество товаров для бесплатной доставки
+                            </label>
+                            <div class="input-group">
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="free_delivery_threshold" 
+                                       name="free_delivery_threshold" 
+                                       value="{{ settings.get('free_delivery_threshold', 3) }}"
+                                       min="1"
+                                       max="20"
+                                       required>
+                                <span class="input-group-text"><i class="bi bi-bag"></i> шт.</span>
+                            </div>
+                            <small class="text-muted">При заказе этого количества товаров и более - доставка бесплатна</small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="standard_delivery_cost" class="form-label">
+                                <i class="bi bi-currency-euro"></i> Стандартная стоимость доставки
+                            </label>
+                            <div class="input-group">
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="standard_delivery_cost" 
+                                       name="standard_delivery_cost" 
+                                       value="{{ settings.get('standard_delivery_cost', 2.0) }}"
+                                       min="0"
+                                       max="100"
+                                       step="0.01"
+                                       required>
+                                <span class="input-group-text">€</span>
+                            </div>
+                            <small class="text-muted">Стоимость доставки для заказов менее указанного выше количества товаров</small>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Pickup Info -->
+                <div class="alert alert-info" role="alert">
+                    <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Информация о самовывозе</h6>
+                    <p class="mb-0">
+                        <strong>🏪 Место самовывоза:</strong> {{ settings.get('pickup_location_name', 'AKROPOLIS') }}<br>
+                        <strong>💰 Стоимость:</strong> <span class="badge bg-success">БЕСПЛАТНО</span>
+                    </p>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Current Settings Info -->
+                <div class="alert alert-secondary" role="alert">
+                    <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Текущие настройки</h6>
+                    <ul class="mb-0 small">
+                        <li><strong>От {{ settings.get('free_delivery_threshold', 3) }} товаров:</strong> Доставка бесплатна</li>
+                        <li><strong>Менее {{ settings.get('free_delivery_threshold', 3) }} товаров:</strong> Доставка {{ settings.get('standard_delivery_cost', 2.0) }}€</li>
+                        <li><strong>Самовывоз:</strong> Всегда бесплатно</li>
+                    </ul>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-check-circle"></i> Сохранить параметры
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Help Text -->
+    <div class="mt-4">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-question-circle"></i> Справка</h6>
+                <p class="card-text small mb-2">
+                    <strong>Пороговое количество товаров:</strong> 
+                    При достижении этого количества товаров в заказе, доставка становится бесплатной.
+                </p>
+                <p class="card-text small mb-0">
+                    <strong>Стандартная стоимость доставки:</strong> 
+                    Применяется к заказам с количеством товаров ниже порога. 
+                    Доставка может быть выполнена или заказчик может выбрать самовывоз (бесплатно).
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: none;
+        border-top: 3px solid #007bff;
+    }
+    
+    .card-header {
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .input-group {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .btn-lg {
+        padding: 0.75rem 2rem;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}

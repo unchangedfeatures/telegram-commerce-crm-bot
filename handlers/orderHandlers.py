@@ -96,7 +96,7 @@ async def format_order_text(items: dict, discount_amount: float = 0,
     if delivery_cost > 0:
         text += f"🚚 *Доставка: {delivery_cost:.2f}€*\n"
     else:
-        text += f"🚚 *Доставка: БЕСПЛАТНО* (от 4 товаров)\n"
+        text += f"🚚 *Доставка: БЕСПЛАТНО* (от 3 товаров)\n"
     
     # Показываем промокод и скидку только если они действительно есть
     if promo_code and promo_code not in ["none", None] and discount_amount > 0:
@@ -126,9 +126,20 @@ async def calculate_discount(promo_code: str, total_amount: float, user_id: int 
             WHERE referrer_telegram_id = $1 AND discount_amount > 0
         """, user_id)
         referral_bonus = float(referral_bonus) if referral_bonus else 0.0
+        
+        # ============================================
+        # НОВОЕ: Защита от превышения скидки
+        # ============================================
+        # Скидка не может быть больше суммы заказа
         discount_amount = min(referral_bonus, total_amount)
+        
+        # ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: Минимальная сумма заказа 1€ после скидки
+        if total_amount - discount_amount < 1.0:
+            discount_amount = max(0, total_amount - 1.0)
+        
         final_amount = total_amount - discount_amount
-        return discount_amount, final_amount, {"type": "referral", "amount": referral_bonus}
+        
+        return discount_amount, final_amount, {"type": "referral", "amount": referral_bonus, "applied": discount_amount}
     
     promo = await db.fetchrow("""
         SELECT * FROM promo_codes 
@@ -149,13 +160,18 @@ async def calculate_discount(promo_code: str, total_amount: float, user_id: int 
     elif promo.get('discount_amount'):
         discount_amount = promo['discount_amount']
     
-    # Ограничиваем скидку суммой заказа
+    # ============================================
+    # НОВОЕ: Защита от превышения скидки для промокодов
+    # ============================================
+    # Скидка не может быть больше суммы заказа
     discount_amount = min(discount_amount, total_amount)
-    final_amount = total_amount - discount_amount
     
+    # ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: Минимальная сумма заказа 1€ после скидки
+    if total_amount - discount_amount < 1.0:
+        discount_amount = max(0, total_amount - 1.0)
+    
+    final_amount = total_amount - discount_amount
     return discount_amount, final_amount, promo
-# Начало оформления заказа
-# В начале функции start_checkout добавим проверки
 
 @router.callback_query(F.data == "checkout")
 async def start_checkout(callback: types.CallbackQuery, state: FSMContext):
@@ -295,7 +311,7 @@ async def show_promo_selection(callback: types.CallbackQuery, state: FSMContext)
     
     # Рассчитываем стоимость доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
-    delivery_cost = 0 if total_items >= 4 else 1.0
+    delivery_cost = 0 if total_items >= 3 else 2.0
     
     # ИСПРАВЛЕНИЕ: Правильный вызов format_order_text
     order_text = await format_order_text(
@@ -354,7 +370,7 @@ async def request_phone(callback: types.CallbackQuery, state: FSMContext):
     
     # Рассчитываем стоимость доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
-    delivery_cost = 0 if total_items >= 4 else 1.0
+    delivery_cost = 0 if total_items >= 3 else 2.0
     
     # ИСПРАВЛЕНИЕ: Правильный вызов format_order_text
     order_text = await format_order_text(
@@ -429,7 +445,7 @@ async def enter_new_phone(callback: types.CallbackQuery, state: FSMContext):
     
     # Рассчитываем стоимость доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
-    delivery_cost = 0 if total_items >= 4 else 1.0
+    delivery_cost = 0 if total_items >= 3 else 2.0
     
     # Формируем текст заказа
     order_text = await format_order_text(
@@ -556,7 +572,7 @@ async def process_request_address(callback: types.CallbackQuery, state: FSMConte
 
     # Рассчитываем стоимость доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
-    delivery_cost = 0 if total_items >= 4 else 1.0
+    delivery_cost = 0 if total_items >= 3 else 2.0
 
     # Формируем текст заказа
     order_text = await format_order_text(
@@ -607,12 +623,18 @@ async def process_request_address(callback: types.CallbackQuery, state: FSMConte
     
     # Проверяем возможность бесплатной доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
-    if total_items < 4:
-        needed = 4 - total_items
+    if total_items < 3:
+        needed = 3 - total_items
         buttons.append([InlineKeyboardButton(
-            text=f"🚚 Бесплатная доставка от 4 товаров (добавить {needed})",
+            text=f"🚚 Бесплатная доставка от 3 товаров (добавить {needed})",
             callback_data="add_for_free_delivery"
         )])
+    
+    # Добавляем кнопку самовывоза
+    buttons.append([InlineKeyboardButton(
+        text="🏪 Самовывоз (AKROPOLIS) - БЕСПЛАТНО",
+        callback_data="select_pickup"
+    )])
     
     buttons.append([InlineKeyboardButton(
         text="🔙 Назад к телефону",
@@ -795,12 +817,18 @@ async def cancel_location_input(message: types.Message, state: FSMContext):
     
     # Проверяем возможность бесплатной доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
-    if total_items < 4:
-        needed = 4 - total_items
+    if total_items < 3:
+        needed = 3 - total_items
         buttons.append([InlineKeyboardButton(
-            text=f"🚚 Бесплатная доставка от 4 товаров (добавить {needed})",
+            text=f"🚚 Бесплатная доставка от 3 товаров (добавить {needed})",
             callback_data="add_for_free_delivery"
         )])
+    
+    # Добавляем кнопку самовывоза
+    buttons.append([InlineKeyboardButton(
+        text="🏪 Самовывоз (AKROPOLIS) - БЕСПЛАТНО",
+        callback_data="select_pickup"
+    )])
     
     buttons.append([InlineKeyboardButton(
         text="🔙 Назад к телефону",
@@ -847,6 +875,21 @@ async def use_saved_address_handler(callback: types.CallbackQuery, state: FSMCon
         address_data=address_text,
         address_text=address_text
     )
+    
+    # ИСПРАВЛЕНИЕ: Переходим к подтверждению
+    await confirm_order(callback, state)
+
+@router.callback_query(F.data == "select_pickup", OrderStates.enter_address)
+async def select_pickup_handler(callback: types.CallbackQuery, state: FSMContext):
+    """Выбор опции самовывоза"""
+    await state.update_data(
+        address_type="pickup",
+        address_data="AKROPOLIS Pickup",
+        address_text="🏪 Самовывоз (AKROPOLIS) - БЕСПЛАТНО",
+        delivery_type="pickup"
+    )
+    
+    await callback.answer()
     
     # ИСПРАВЛЕНИЕ: Переходим к подтверждению
     await confirm_order(callback, state)
@@ -976,7 +1019,7 @@ async def confirm_order(event, state: FSMContext):
     
     # Рассчитываем стоимость доставки
     total_items = sum(item['quantity'] for item in data['items'].values())
-    delivery_cost = 0 if total_items >= 4 else 1.0
+    delivery_cost = 0 if total_items >= 3 else 2.0
     
     # ИСПРАВЛЕНИЕ: final_amount УЖЕ включает все (товары - скидка)
     # Доставка добавляется ТОЛЬКО для отображения
@@ -1184,7 +1227,7 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                 # Списание реферальных бонусов
                 if data.get('promo_code') == 'referral' and data.get('discount_amount', 0) > 0:
                     used_amount = data['discount_amount']
-                    remaining = used_amount
+                    remaining = Decimal(str(used_amount))
                     
                     bonuses = await conn.fetch("""
                         SELECT referral_discount_id, discount_amount 
@@ -1209,7 +1252,7 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
                         
                         remaining -= deduct
                     
-                    print(f"✅ Списано {used_amount - remaining}€ реферальных бонусов")
+                    print(f"✅ Списано {Decimal(str(used_amount)) - remaining}€ реферальных бонусов")
                 
                 # Очищаем корзину
                 await conn.execute("DELETE FROM cart WHERE telegram_id = $1", user_id)
@@ -1258,8 +1301,8 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
 
 
 async def notify_admins_about_order(order_id: int, order_data: dict, final_amount: float, delivery_cost: float):
-    """Отправка уведомлений админам"""
-    from bot_instance import notification_service
+    """Отправка уведомлений админам и в канал заказов"""
+    from bot_instance import notification_service, bot_instance
     
     try:
         admins = await db.fetch("SELECT telegram_id FROM users WHERE role = 'admin'")
@@ -1297,62 +1340,56 @@ async def notify_admins_about_order(order_id: int, order_data: dict, final_amoun
             f"/confirm {order_id}"
         )
         
+        # Отправляем уведомления каждому админу
         notifications = [
             (admin['telegram_id'], notification_text, {})
             for admin in admins
         ]
         await notification_service.add_bulk_to_queue(notifications)
         
+        # Отправляем в канал заказов
+        if config.ORDERS_CHAT_ID:
+            await bot_instance.send_message(
+                config.ORDERS_CHAT_ID,
+                notification_text
+            )
+            print(f"✅ Уведомление отправлено в канал заказов")
+        
         print(f"✅ {len(admins)} уведомлений добавлено в очередь")
         
     except Exception as e:
         print(f"🔥 Ошибка notify_admins_about_order: {e}")
-    """Отправка уведомлений админам"""
-    from bot_instance import notification_service
+@router.callback_query(F.data == "select_pickup")
+async def select_pickup(callback: types.CallbackQuery, state: FSMContext):
+    """????? ?????????? (AKROPOLIS)"""
+    data = await state.get_data()
+    settings = await db.get_delivery_settings()
     
-    try:
-        admins = await db.fetch("SELECT telegram_id FROM users WHERE role = 'admin'")
-        
-        if not admins:
-            print("⚠️ Нет администраторов")
-            return
-        
-        username = order_data.get('username', 'без username')
-        phone = order_data.get('phone', 'не указан')
-        address = order_data.get('address_text', 'не указан')
-        
-        notification_text = (
-            f"🆕 НОВЫЙ ЗАКАЗ #{order_id}\n\n"
-            f"👤 @{username}\n"
-            f"📞 {phone}\n"
-            f"📍 {address}\n\n"
-            f"🛒 Состав:\n"
-        )
-        
-        for item in order_data['items'].values():
-            item_total = item['price'] * item['quantity']
-            notification_text += f"• {item['name']}: {item['quantity']}шт × {item['price']:.2f}€ = {item_total:.2f}€\n"
-        
-        # ИСПРАВЛЕНИЕ: Правильный расчет
-        notification_text += (
-            f"\n💰 Сумма товаров: {order_data['total_amount']:.2f}€\n"
-            f"🎁 Скидка: -{order_data.get('discount_amount', 0):.2f}€\n"
-            f"🚚 Доставка: +{delivery_cost:.2f}€\n"
-            f"💳 ИТОГО: {final_amount:.2f}€\n\n"
-            f"Команды:\n"
-            f"/accept {order_id}\n"
-            f"/decline {order_id}\n"
-            f"/deliver {order_id} <мин>\n"
-            f"/confirm {order_id}"
-        )
-        
-        notifications = [
-            (admin['telegram_id'], notification_text, {})
-            for admin in admins
-        ]
-        await notification_service.add_bulk_to_queue(notifications)
-        
-        print(f"✅ {len(admins)} уведомлений добавлено в очередь")
-        
-    except Exception as e:
-        print(f"🔥 Ошибка notify_admins_about_order: {e}")
+    # ????????? ??? ???????? ? ?????
+    pickup_location = settings['pickup_location_name']
+    await state.update_data(
+        delivery_type='pickup',
+        delivery_address=pickup_location,
+        delivery_cost=0  # ????????? ?????????
+    )
+    
+    # ????????? ????? ?????????????
+    text = f' *?? ??????? ?????????*\n\n'
+    text += f' *?????: {pickup_location}*\n'
+    text += f' *????????: ?????????*\n\n'
+    text += '??????? ???? ??? ?????????????:'
+    
+    buttons = [
+        [InlineKeyboardButton(text=' ???????????', callback_data='confirm_pickup')],
+        [InlineKeyboardButton(text=' ?????', callback_data='request_address')]
+    ]
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+    await callback.answer()
+
+@router.callback_query(F.data == "confirm_pickup")
+async def confirm_pickup(callback: types.CallbackQuery, state: FSMContext):
+    """????????????? ?????????? ? ??????? ? ??????"""
+    await confirm_order(callback, state)

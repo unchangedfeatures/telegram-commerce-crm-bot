@@ -784,17 +784,17 @@ async def get_order_full_optimized(order_id: int):
 # ============================================================================
 
 async def get_delivery_settings():
-    """???????? ????????? ????????"""
+    """Получить параметры доставки"""
     settings = await fetchrow("""
         SELECT * FROM delivery_settings 
         WHERE is_active = TRUE
         LIMIT 1
     """)
     if not settings:
-        # ?????????? ???????? ?? ?????????
+        # Возвращаем значения по умолчанию
         return {
-            'free_delivery_threshold': 3.0,
-            'standard_delivery_cost': 1.0,
+            'free_delivery_threshold': 3,
+            'standard_delivery_cost': 2.0,
             'high_demand_delivery_cost': 2.0,
             'high_demand_orders_threshold': 7,
             'pickup_location_name': 'AKROPOLIS',
@@ -804,7 +804,7 @@ async def get_delivery_settings():
     return dict(settings)
 
 async def update_delivery_settings(**kwargs):
-    """???????? ????????? ????????"""
+    """Обновить параметры доставки"""
     allowed_fields = [
         'free_delivery_threshold',
         'standard_delivery_cost',
@@ -819,14 +819,14 @@ async def update_delivery_settings(**kwargs):
     if not updates:
         return None
     
-    set_clause = ', '.join([f"{k} = $" + (i+1).ToString() for i, k in enumerate(updates.keys())])
+    set_clause = ', '.join([f"{k} = $" + str(i+1) for i, k in enumerate(updates.keys())])
     set_clause += ", updated_at = NOW()"
     
     query = f"UPDATE delivery_settings SET {set_clause} WHERE is_active = TRUE RETURNING *"
     return await fetchrow(query, *updates.values())
 
 async def count_orders_today():
-    """?????????? ?????????? ???????? ??????? ???????"""
+    """Подсчитать количество заказов за текущий день"""
     count = await fetchval("""
         SELECT COUNT(*) FROM orders
         WHERE status IN ('accepted', 'delivery', 'delivered')
@@ -835,7 +835,7 @@ async def count_orders_today():
     return count or 0
 
 async def calculate_delivery_cost(total_amount: float, delivery_type: str = 'delivery') -> tuple:
-    """?????????? ????????? ????????"""
+    """Рассчитать стоимость доставки"""
     settings = await get_delivery_settings()
     
     if delivery_type == 'pickup':
@@ -851,7 +851,7 @@ async def calculate_delivery_cost(total_amount: float, delivery_type: str = 'del
     
     if orders_today >= high_demand_threshold:
         delivery_cost = float(settings['high_demand_delivery_cost'])
-        high_demand_note = " ??????? ?????!"
+        high_demand_note = " Высокий спрос!"
     else:
         delivery_cost = float(settings['standard_delivery_cost'])
     
